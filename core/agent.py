@@ -47,10 +47,8 @@ class MumyCodAgent:
         # Sembol indeksi oluştur
         self.symbol_index = SymbolIndexer().build_symbol_index(".")
         
-        # Kod retrieveri
-        self.retriever = CodeRetriever(
-            self.symbol_index
-        )
+        # Kod retrieveri (Doğru şekilde başlatıldı)
+        self.retriever = CodeRetriever(brain_path="memory/brain.json")
         
         # Dosya okuyucu
         self.file_reader = FileReader()
