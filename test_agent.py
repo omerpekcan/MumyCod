@@ -1,19 +1,28 @@
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from core.agent import MumyCodAgent
 
-def test_agent_workflow():
-    # Ajanı başlat
+def test_final():
+    print("--- Ajan başlatılıyor... ---")
     agent = MumyCodAgent()
     
-    print("--- Ajan İş Akışı Testi: Çok Adımlı Yazılım Geliştirme ---")
-    prompt = (
-        "Lütfen 'workspace' dizini altında 'todo_app.py' adında bir Python dosyası oluştur. "
-        "İçine görev ekleme, listeleme ve silme özelliklerine sahip çalışan bir CLI Todo uygulaması kodu yaz. "
-        "Ardından 'execute_command' aracını kullanarak bu yeni dosyayı çalıştır ve uygulamanın hatasız çalıştığını bana raporla."
-    )
+    # Burada cevabı alıp bir değişkene atıyoruz
+    print("--- Araç çağrılıyor (read_file)... ---")
+    output = agent.ask("[TOOL:read_file(tools/terminal_tools.py)] Bu dosyanın içeriğini ve amacını bana Türkçe özetle.")
     
-    print(f"Soru: {prompt}\n")
-    response = agent.ask(prompt)
-    print(f"Cevap:\n{response}")
+    # İşte burası kritik: Eğer bir çıktı geldiyse bunu terminale ZORLA bastırıyoruz
+    print("\n" + "="*30)
+    print("AJANDAN GELEN CEVAP:")
+    print("="*30)
+    print(output)
+    print("="*30)
 
 if __name__ == "__main__":
-    test_agent_workflow()
+    test_final()
+
+    # Ajanı test etmek için:
+print("--- Git yeteneği testi ---")
+response = agent.ask("[TOOL:git_commit('Ajanıma git yeteneği kazandırdım')]")
+print(f"Git çıktısı: {response}")
