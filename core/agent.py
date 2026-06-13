@@ -7,7 +7,7 @@ from core.planner import Planner
 from indexing.symbol_index import SymbolIndexer
 from retrieval.retriever import CodeRetriever
 from tools.file_reader import FileReader
-from tools.file_tools import write_to_file
+from tools.file_tools import write_to_file, read_file
 
 
 class MumyCodAgent:
@@ -25,8 +25,10 @@ class MumyCodAgent:
             "standart markdown formatında (```csharp vb.) vermeye özen göster. Uzun "
             "ve alakasız açıklamalardan kaçın.\n\n"
             "ARAÇLAR:\n"
-            "Dosya oluşturmak veya güncellemek için `write_to_file(filepath, content)` aracını kullanabilirsin.\n"
-            "Bunu kullanmak için yanıtında şu formatı kullan: [TOOL:write_to_file(dosya_yolu, içerik)]"
+            "1. Dosya oluşturmak veya güncellemek için `write_to_file(filepath, content)` aracını kullanabilirsin.\n"
+            "2. Mevcut bir dosyayı okumak için `read_file(filepath)` aracını kullanabilirsin.\n"
+            "Bunu kullanmak için yanıtında şu formatı kullan:\n"
+            "[TOOL:write_to_file(dosya_yolu, içerik)] veya [TOOL:read_file(dosya_yolu)]"
         )
         
         # Hafıza şefini başlatıyoruz
@@ -109,16 +111,26 @@ DOSYA İÇERİĞİ:
         response = self.provider.chat(self.history)
         
         # 3. Araç kullanımı kontrolü (Tool Calling)
-        # [TOOL:write_to_file(path, content)] formatını ara
-        # Regex'i daha esnek hale getirdik (tırnak işaretlerini daha iyi yakalamak için)
-        tool_match = re.search(r"\[TOOL:write_to_file\((.*?),\s*(.*?)\)\]", response, re.DOTALL)
         
-        if tool_match:
-            path = tool_match.group(1).strip().strip("'").strip('"')
-            content = tool_match.group(2).strip().strip("'").strip('"')
+        # write_to_file kontrolü
+        write_match = re.search(r"\[TOOL:write_to_file\((.*?),\s*(.*?)\)\]", response, re.DOTALL)
+        if write_match:
+            path = write_match.group(1).strip().strip("'").strip('"')
+            content = write_match.group(2).strip().strip("'").strip('"')
             
             # Aracı çalıştır
             tool_result = write_to_file(path, content)
+            
+            # Sonucu yanıta ekle
+            response += f"\n\n[Sistem: {tool_result}]"
+            
+        # read_file kontrolü
+        read_match = re.search(r"\[TOOL:read_file\((.*?)\)\]", response, re.DOTALL)
+        if read_match:
+            path = read_match.group(1).strip().strip("'").strip('"')
+            
+            # Aracı çalıştır
+            tool_result = read_file(path)
             
             # Sonucu yanıta ekle
             response += f"\n\n[Sistem: {tool_result}]"
