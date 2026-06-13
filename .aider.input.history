@@ -790,3 +790,12 @@
 +    Yanıtları Türkçeleştir: Ajanın sistem mesajlarını ve hata çıktılarını (örneğin 'Unknown command' yerine 'Bilinmeyen komut') tamamen Türkçe'ye çevir.
 +
 +    Arayüz Etiketi: Sistemin başlangıç mesajını 'MumyCod Terminal Başlatıldı' ve kullanıcıdan giriş alma kısmını 'Kullanıcı >>' olarak güncelle."
+
+# 2026-06-13 23:39:10.775434
++retrieve_relevant_chunks metoduna threshold: float = 0.6 parametresi ekle.
++
++Döngü içinde if score < threshold: continue kuralı ekle. Böylece alakasız kod parçaları LLM'e gönderilip token harcanmasın.
++
++Eğer top_k kadar sonuç bulamazsa, loglara [DEBUG] Yeterli eşleşme bulunamadı diye yazsın.
++
++retrieve işlemi sonucunda dönen parçaların toplam token sayısını kabaca hesaplayan bir print ekle."

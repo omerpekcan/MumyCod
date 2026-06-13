@@ -18,7 +18,7 @@ class CodeRetriever:
         print(f"[DEBUG] Hafıza dosyası bulunamadı: {self.brain_path}")
         return []
 
-    def retrieve_relevant_chunks(self, query: str, top_k: int = 3) -> list:
+    def retrieve_relevant_chunks(self, query: str, top_k: int = 3, threshold: float = 0.6) -> list:
         if not self.data:
             print("[DEBUG] Hafıza boş, arama yapılamıyor.")
             return []
@@ -33,6 +33,11 @@ class CodeRetriever:
                 
             # Kosinüs benzerliği (vektörler normalize edildiği için nokta çarpımı yeterli)
             score = sum(q * d for q, d in zip(query_vector, doc_vector))
+            
+            # Threshold kontrolü: Alakasız parçaları filtrele
+            if score < threshold:
+                continue
+                
             chunk_text = item.get("text") or item.get("chunk") or ""
             
             scored_chunks.append({
@@ -43,4 +48,15 @@ class CodeRetriever:
             })
             
         scored_chunks.sort(key=lambda x: x["score"], reverse=True)
-        return scored_chunks[:top_k]
+        results = scored_chunks[:top_k]
+        
+        # Yeterli sonuç bulunamadıysa logla
+        if len(results) < top_k:
+            print("[DEBUG] Yeterli eşleşme bulunamadı")
+        
+        # Token hesabı (1 token ~= 4 karakter)
+        total_chars = sum(len(r['text']) for r in results)
+        total_tokens = total_chars / 4
+        print(f"[DEBUG] Toplam tahmini token sayısı: {int(total_tokens)}")
+        
+        return results
