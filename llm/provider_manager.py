@@ -22,13 +22,12 @@ class ProviderManager:
 
     def _handle_error(self, e, provider_name):
         """Hata türünü analiz eder ve aksiyon belirler."""
-        # SDK'lardan gelen hata kodlarını yakalamaya çalışıyoruz
         status_code = getattr(e, 'status_code', getattr(e, 'code', 0))
         
-        if status_code == 429:
-            print(f"[DEBUG] {provider_name} 429 (Quota) hatası verdi. 2 saniye bekleniyor...")
-            time.sleep(2)
-            return "RETRY"
+        # 429 ve 503 hatalarında hemen bir sonrakine geçmek istiyoruz (retry yok)
+        if status_code in [429, 503]:
+            print(f"[DEBUG] {provider_name} {status_code} hatası verdi. Bir sonraki sağlayıcıya geçiliyor.")
+            return "NEXT"
         elif status_code in [401, 404]:
             print(f"[DEBUG] {provider_name} {status_code} hatası verdi. Blacklist'e alınıyor.")
             self.blacklist.add(provider_name)
@@ -45,37 +44,33 @@ class ProviderManager:
             if provider["name"] in self.blacklist or not provider["api_key"]:
                 continue
             
-            # 429 hatası için retry mekanizması (en fazla 2 deneme)
-            for attempt in range(2):
-                try:
-                    print(f"[DEBUG] {provider['name']} ile deneniyor...")
-                    
-                    if provider["name"] == "gemini":
-                        response = self.client_gemini.models.generate_content(
-                            model="models/gemini-3.5-flash",
-                            contents=prompt
-                        )
-                        return response.text
-                        
-                    elif provider["name"] == "groq":
-                        chat_completion = self.client_groq.chat.completions.create(
-                            messages=[{"role": "user", "content": prompt}],
-                            model="llama-3.3-70b-versatile",
-                        )
-                        return chat_completion.choices[0].message.content
-                        
-                    elif provider["name"] == "openrouter":
-                        completion = self.client_openrouter.chat.completions.create(
-                            model="google/gemini-2.0-flash-lite-preview:free",
-                            messages=[{"role": "user", "content": prompt}]
-                        )
-                        return completion.choices[0].message.content
+            try:
+                print(f"[DEBUG] {provider['name']} ile deneniyor...")
                 
-                except Exception as e:
-                    action = self._handle_error(e, provider["name"])
-                    if action == "RETRY":
-                        continue # Retry döngüsüne devam et
-                    else:
-                        break # Blacklist veya Fail durumunda bu sağlayıcıyı bırak
+                if provider["name"] == "gemini":
+                    response = self.client_gemini.models.generate_content(
+                        model="models/gemini-3.5-flash",
+                        contents=prompt
+                    )
+                    return response.text
+                    
+                elif provider["name"] == "groq":
+                    chat_completion = self.client_groq.chat.completions.create(
+                        messages=[{"role": "user", "content": prompt}],
+                        model="llama-3.3-70b-versatile",
+                    )
+                    return chat_completion.choices[0].message.content
+                    
+                elif provider["name"] == "openrouter":
+                    completion = self.client_openrouter.chat.completions.create(
+                        model="google/gemini-2.0-flash-lite-preview:free",
+                        messages=[{"role": "user", "content": prompt}]
+                    )
+                    return completion.choices[0].message.content
+            
+            except Exception as e:
+                action = self._handle_error(e, provider["name"])
+                # Hata durumunda döngü bir sonraki sağlayıcıya devam eder
+                continue
         
         raise Exception("Tüm sağlayıcılar başarısız oldu.")
