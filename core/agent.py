@@ -48,8 +48,9 @@ class MumyCodAgent:
             text = response.text if hasattr(response, "text") else str(response)
             print(f"[DEBUG] LLM'den yanıt alındı. Yanıt uzunluğu: {len(text)} karakter.")
             
-            # 2. Araçları parse et (Daha esnek regex)
-            # write_file için özel regex (iki argümanlı)
+            # 2. Araçları parse et
+            
+            # write_file için özel regex (iki argümanlı, çok satırlı içerik destekli)
             write_match = re.search(r"\[TOOL:write_file\((.*?),\s*(.*?)\)\]", text, re.DOTALL)
             if write_match:
                 path, content = write_match.groups()

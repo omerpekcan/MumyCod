@@ -15,8 +15,8 @@ def write_file(filepath: str, content: str) -> str:
         if dir_name and not os.path.exists(dir_name):
             os.makedirs(dir_name, exist_ok=True)
             
+        # Markdown kod bloklarını temizle
         cleaned_content = content.strip()
-        
         if cleaned_content.startswith("```"):
             lines = cleaned_content.splitlines()
             if lines[0].startswith("```"):
