@@ -8,8 +8,16 @@ from tools.git_tools import GitTools
 from retrieval.retriever import CodeRetriever
 
 class MumyCodAgent:
+    COMMAND_MAP = {
+        '/çıkış': 'exit',
+        '/sağlayıcı': 'provider',
+        '/model': 'model',
+        '/temizle': 'clear',
+        '/durum': 'status'
+    }
+
     def __init__(self):
-        print("[DEBUG] MumyCodAgent başlatılıyor...")
+        print("MumyCod Terminal Başlatıldı")
         # ProviderManager ile çoklu sağlayıcı desteği aktif
         self.provider_manager = ProviderManager()
         # brain.json dosyasının doğru yolda olduğundan emin oluyoruz
@@ -36,13 +44,20 @@ class MumyCodAgent:
         )
         print("[DEBUG] MumyCodAgent başarıyla başlatıldı.")
 
+    def handle_command(self, user_query: str) -> str:
+        """Komutları işler ve eşleşen komut varsa çalıştırır."""
+        if user_query.startswith('/'):
+            cmd = self.COMMAND_MAP.get(user_query.split()[0])
+            if cmd:
+                return f"Komut işleniyor: {cmd}"
+            return "Bilinmeyen komut"
+        return None
+
     def _execute_tool(self, tool_call: str) -> str:
-        """
-        Basit string ayrıştırma ile araçları çalıştırır.
-        tool_call formatı: name(args)
-        """
+        """Araçları çalıştıran yardımcı metod."""
+        print(f"[DEBUG] Araç çalıştırılıyor: {tool_call}")
+        
         try:
-            # name(args) -> name, args
             if "(" not in tool_call or ")" not in tool_call:
                 return "Hata: Geçersiz araç formatı."
             
@@ -55,13 +70,13 @@ class MumyCodAgent:
             if tool_name == "write_file":
                 parts = tool_args.split(',', 1)
                 if len(parts) == 2:
-                    path = parts[0].strip().strip("'").strip('"')
-                    content = parts[1].strip().strip("'").strip('"')
+                    path = parts[0].replace('path=', '').strip().strip("'").strip('"')
+                    content = parts[1].replace('content=', '').strip().strip("'").strip('"')
                     return write_file(path, content)
                 return "Hata: write_file için dosya_yolu ve içerik gerekli."
             
             elif tool_name == "read_file":
-                return read_file(tool_args.strip("'").strip('"'))
+                return read_file(tool_args.replace('filename=', '').strip("'").strip('"'))
             
             elif tool_name == "execute_command":
                 return execute_command(tool_args.strip("'").strip('"'))
@@ -82,8 +97,12 @@ class MumyCodAgent:
             return f"Araç çalıştırılırken hata oluştu: {str(e)}"
 
     def ask(self, user_query: str) -> str:
-        print(f"\n[DEBUG] --- ask() metodu çağrıldı ---")
-        print(f"[DEBUG] Soru: {user_query}")
+        # Komut kontrolü
+        cmd_result = self.handle_command(user_query)
+        if cmd_result:
+            return cmd_result
+
+        print(f"\nKullanıcı >> {user_query}")
         
         try:
             # 1. LLM'e sor
