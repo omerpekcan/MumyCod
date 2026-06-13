@@ -1,32 +1,20 @@
 from core.agent import MumyCodAgent
 
-def test_file_operations():
+def test_agent_workflow():
     # Ajanı başlat
     agent = MumyCodAgent()
     
-    print("--- 1. Dosya Okuma Testi ---")
-    prompt1 = "Bana 'test_output.txt' dosyasının içeriğini oku."
-    print(f"Soru: {prompt1}")
-    response1 = agent.ask(prompt1)
-    print(f"Cevap: {response1}\n")
+    print("--- Ajan İş Akışı Testi: Kod Analizi ve İyileştirme ---")
+    prompt = (
+        "Projedeki 'tools/terminal_tools.py' dosyasını oku. "
+        "İçindeki kod yapısını incele, Windows encoding (karakter kodlama) yönetiminin "
+        "doğru yapılıp yapılmadığını kontrol et ve eğer kodda iyileştirilecek bir yer varsa "
+        "dosyayı 'write_to_file' kullanarak güncelle. Sonucu bana raporla."
+    )
     
-    print("--- 2. Dosya Güncelleme Testi ---")
-    prompt2 = "'test_output.txt' dosyasının içeriğini 'Yeni otonom okuma ve yazma testi başarılı!' olarak güncelle."
-    print(f"Soru: {prompt2}")
-    response2 = agent.ask(prompt2)
-    print(f"Cevap: {response2}\n")
-    
-    print("--- 3. Terminal Komut Testi ---")
-    prompt3 = "Bana projenin kök dizinindeki (C:\\Users\\Mumy\\MumyCod) dosyaları listele."
-    print(f"Soru: {prompt3}")
-    response3 = agent.ask(prompt3)
-    print(f"Cevap: {response3}\n")
-    
-    print("--- 4. Otomatik Proje Temizliği ---")
-    prompt4 = "Projenin kök dizinindeki 0 baytlık gereksiz tüm hayalet dosyaları tespit et ve 'execute_command' tool'unu kullanarak (Windows'un 'del' komutu ile) güvenli bir şekilde sil, temizle."
-    print(f"Soru: {prompt4}")
-    response4 = agent.ask(prompt4)
-    print(f"Cevap: {response4}")
+    print(f"Soru: {prompt}\n")
+    response = agent.ask(prompt)
+    print(f"Cevap:\n{response}")
 
 if __name__ == "__main__":
-    test_file_operations()
+    test_agent_workflow()
