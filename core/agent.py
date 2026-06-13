@@ -40,12 +40,8 @@ class MumyCodAgent:
         """Araçları çalıştıran yardımcı metod."""
         print(f"[DEBUG] Araç çalıştırılıyor: {tool_name}, Argümanlar: {tool_args}")
         
-        # Argümanları temizle (tırnakları kaldır)
-        # Not: write_file için argümanları burada değil, çağrıldığı yerde ayıracağız
-        
         if tool_name == "write_file":
             # write_file için argümanları virgülle ayır (ilk virgül dosya yolu, sonrası içerik)
-            # İçerikte virgül olabilir, bu yüzden split(..., 1) kullanıyoruz
             parts = tool_args.split(',', 1)
             if len(parts) == 2:
                 path = parts[0].strip().strip("'").strip('"')
@@ -84,7 +80,6 @@ class MumyCodAgent:
             # 2. Araçları parse et
             # Regex: [TOOL:isim(argümanlar)]
             # re.DOTALL ile çok satırlı içerikleri yakalıyoruz
-            # Esnek regex: tırnakları ve boşlukları önemsemeden yakalar
             tool_match = re.search(r"\[TOOL:(\w+)\((.*?)\)\]", response_text, re.DOTALL)
             
             if tool_match:
