@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from google import genai
 from llm.base_provider import BaseProvider
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 class GeminiProvider(BaseProvider):
     def __init__(self):
@@ -22,6 +23,7 @@ class GeminiProvider(BaseProvider):
             "tools": [] # Araçlar burada tanımlanabilir
         }
 
+    @retry(stop=stop_after_attempt(3), wait=wait_fixed(10))
     def generate(self, prompt: str) -> str:
         response = self.client.models.generate_content(
             model=self.model_name,
@@ -30,6 +32,7 @@ class GeminiProvider(BaseProvider):
         )
         return response.text
 
+    @retry(stop=stop_after_attempt(3), wait=wait_fixed(10))
     def chat(self, history_or_prompt) -> str:
         # Eğer gelen veri düz bir string ise direkt üret ve dön
         if isinstance(history_or_prompt, str):
