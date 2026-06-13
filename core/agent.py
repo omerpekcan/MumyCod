@@ -8,6 +8,7 @@ from indexing.symbol_index import SymbolIndexer
 from retrieval.retriever import CodeRetriever
 from tools.file_reader import FileReader
 from tools.file_tools import write_to_file, read_file
+from tools.terminal_tools import execute_command
 
 
 class MumyCodAgent:
@@ -27,8 +28,9 @@ class MumyCodAgent:
             "ARAÇLAR:\n"
             "1. Dosya oluşturmak veya güncellemek için `write_to_file(filepath, content)` aracını kullanabilirsin.\n"
             "2. Mevcut bir dosyayı okumak için `read_file(filepath)` aracını kullanabilirsin.\n"
+            "3. Terminal komutu çalıştırmak için `execute_command(command)` aracını kullanabilirsin.\n"
             "Bunu kullanmak için yanıtında şu formatı kullan:\n"
-            "[TOOL:write_to_file(dosya_yolu, içerik)] veya [TOOL:read_file(dosya_yolu)]"
+            "[TOOL:write_to_file(dosya_yolu, içerik)] veya [TOOL:read_file(dosya_yolu)] veya [TOOL:execute_command(komut)]"
         )
         
         # Hafıza şefini başlatıyoruz
@@ -132,6 +134,17 @@ DOSYA İÇERİĞİ:
             
             # Aracı çalıştır
             tool_result = read_file(path)
+            
+            # Sonucu yanıta ekle
+            response += f"\n\n[Sistem: {tool_result}]"
+            
+        # execute_command kontrolü
+        cmd_match = re.search(r"\[TOOL:execute_command\((.*?)\)\]", response, re.DOTALL)
+        if cmd_match:
+            command = cmd_match.group(1).strip().strip("'").strip('"')
+            
+            # Aracı çalıştır
+            tool_result = execute_command(command)
             
             # Sonucu yanıta ekle
             response += f"\n\n[Sistem: {tool_result}]"
