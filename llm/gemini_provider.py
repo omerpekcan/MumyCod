@@ -1,39 +1,55 @@
 import os
-from google import genai
-from llm.base_provider import BaseProvider
+import google.generativeai as genai
 
-class GeminiProvider(BaseProvider):
-    def __init__(self, api_key: str = None, model_name: str = "gemini-2.5-flash-lite"):
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        self.client = genai.Client(api_key=self.api_key)
-        self.model_name = model_name
-
-    def generate(self, prompt: str) -> str:
-        response = self.client.models.generate_content(
-            model=self.model_name,
-            contents=prompt
-        )
-        return response.text
-
-    def chat(self, messages: list) -> str:
-        # Gemini formatına dönüştür
-        formatted_messages = []
-        for msg in messages:
-            # Gemini API'de 'system' rolü genellikle 'user' olarak gönderilir veya model konfigürasyonunda belirtilir.
-            # Burada basitlik adına tüm rolleri 'user' veya 'model' olarak eşliyoruz.
-            role = "user" if msg["role"] in ["user", "system"] else "model"
-            formatted_messages.append({"role": role, "parts": [{"text": msg["content"]}]})
+class GeminiProvider:
+    def __init__(self):
+        # API anahtarını ortam değişkenlerinden güvenle alıyoruz
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("Hata: GEMINI_API_KEY ortam değişkeni bulunamadı! Lütfen .env dosyanızı veya terminal değişkenlerinizi kontrol edin.")
         
-        # Yeni SDK'da generate_content tüm geçmişi liste olarak kabul eder
-        response = self.client.models.generate_content(
-            model=self.model_name,
-            contents=formatted_messages
-        )
-        return response.text
+        genai.configure(api_key=api_key)
+        # Kararlı ve otonom işlere en uygun model olan gemini-2.5-flash sürümünü ayağa kaldırıyoruz
+        self.model = genai.GenerativeModel("gemini-2.5-flash")
 
-    def summarize(self, text: str) -> str:
-        return self.generate(f"Summarize this: {text}")
+    def chat(self, history_or_prompt):
+        """
+        Gelen veriyi analiz eder; eğer düz metinse doğrudan üretir,
+        eğer MumyCod geçmiş listesiyse Gemini'nin anladığı formata dönüştürür.
+        """
+        try:
+            # Eğer gelen veri düz bir string ise direkt üret ve dön
+            if isinstance(history_or_prompt, str):
+                response = self.model.generate_content(history_or_prompt)
+                return response
 
-    def embed(self, text: str) -> list[float]:
-        # Placeholder
-        return [0.0]
+            # Eğer gelen veri bir listeyse (Ajan geçmişiyse) formatı tam uyumlu hale getiriyoruz
+            formatted_contents = []
+            for message in history_or_prompt:
+                # MumyCod sisteminde 'role' anahtarını aynen koru
+                role = message.get("role", "user")
+                
+                # 'parts' listesindeki metinleri toparla
+                parts_list = message.get("parts", [])
+                text_content = ""
+                if isinstance(parts_list, list) and len(parts_list) > 0:
+                    text_content = str(parts_list[0])
+                else:
+                    text_content = str(parts_list)
+                
+                # Gemini kütüphanesinin tam olarak beklediği yapı: {'role': ..., 'parts': [...]}
+                formatted_contents.append({
+                    "role": role,
+                    "parts": [text_content]
+                })
+
+            # Temizlenmiş ve 'content' hatası vermesi imkansız olan formatı API'ye uçuruyoruz
+            response = self.model.generate_content(formatted_contents)
+            return response
+
+        except Exception as e:
+            # Hata oluşursa terminalde neyin eksik olduğunu görebilmemiz için buraya düşecek
+            class FallbackResponse:
+                def __init__(self, text_val):
+                    self.text = text_val
+            return FallbackResponse(f"Gemini Sağlayıcı Hatası: {str(e)}")

@@ -1,183 +1,48 @@
-import os
 import re
-from typing import List, Dict, Any
+import os
+import traceback
 from llm.gemini_provider import GeminiProvider
-from core.session_manager import SessionManager
-from core.planner import Planner
-from indexing.symbol_index import SymbolIndexer
-from retrieval.retriever import CodeRetriever
-from tools.file_reader import FileReader
-from tools.file_tools import write_to_file, read_file
+from tools.file_tools import read_file, write_to_file
 from tools.terminal_tools import execute_command
-
+from retrieval.retriever import CodeRetriever
 
 class MumyCodAgent:
-    """
-    MumyCod'un ana karar mekanizması (Agent).
-    Hafızayı ve LLM sağlayıcısını koordine eder.
-    """
-    
-    def __init__(self, model_name: str = "gemini-2.5-flash-lite"):
-        # Yapay zekaya nasıl davranması gerektiğini dikte eden sistem talimatı
-        self.system_prompt = (
-            "MumyCod: İleri düzeyde, zeki ve yüksek kapasiteli bir AI kodlama asistanısın.\n"
-            "Kullanıcıya kodlama yolculuğunda yardım ediyorsun. Yanıtların net, "
-            "doğru, üretim için hazır ve çözüm odaklı olmalı. Kod bloklarını her zaman "
-            "standart markdown formatında (```csharp vb.) vermeye özen göster. Uzun "
-            "ve alakasız açıklamalardan kaçın.\n\n"
-            "ARAÇLAR:\n"
-            "1. Dosya oluşturmak veya güncellemek için `write_to_file(filepath, content)` aracını kullanabilirsin.\n"
-            "2. Mevcut bir dosyayı okumak için `read_file(filepath)` aracını kullanabilirsin.\n"
-            "3. Terminal komutu çalıştırmak için `execute_command(command)` aracını kullanabilirsin.\n"
-            "4. Kod tabanında arama yapmak için `search_codebase(query)` aracını kullanabilirsin.\n"
-            "Bunu kullanmak için yanıtında şu formatı kullan:\n"
-            "[TOOL:write_to_file(dosya_yolu, içerik)] veya [TOOL:read_file(dosya_yolu)] veya [TOOL:execute_command(komut)] veya [TOOL:search_codebase(sorgu)]"
-        )
-        
-        # Hafıza şefini başlatıyoruz
-        self.session = SessionManager(system_prompt=self.system_prompt)
-        
-        # Gemini sağlayıcısını başlatıyoruz (API anahtarını ortam değişkeninden alıyoruz)
-        api_key = os.getenv("GEMINI_API_KEY")
-        self.provider = GeminiProvider(api_key=api_key, model_name=model_name)
-        
-        # Planlayıcı
-        self.planner = Planner()
-        
-        # Sembol indeksi oluştur
-        self.symbol_index = SymbolIndexer().build_symbol_index(".")
-        
-        # Kod retrieveri (Doğru şekilde başlatıldı)
-        self.retriever = CodeRetriever(brain_path="memory/brain.json")
-        
-        # Dosya okuyucu
-        self.file_reader = FileReader()
-        
-        # Sohbet geçmişi (Memory)
-        self.history = [
-            {
-                "role": "system",
-                "content": self.system_prompt
-            }
-        ]
+    def __init__(self):
+        self.provider = GeminiProvider()
+        self.retriever = CodeRetriever()
+        self.history = []
 
-    def ask(self, user_input: str) -> str:
-        """
-        Kullanıcıdan gelen soruyu alır, hafıza geçmişiyle harmanlar,
-        yapay zekaya sorar ve cevabı döner.
-        """
-        if not user_input.strip():
-            return "Kanka boş mesaj gönderdin, ne yapacağımı bilemedim. 🤔"
+    def ask(self, user_query: str) -> str:
+        print(f"[DEBUG] Soru alındı: {user_query}")
+        try:
+            # 1. LLM'e sor
+            print("[DEBUG] LLM'e gönderiliyor...")
+            response = self.provider.chat(user_query)
             
-        # 1. Kullanıcının mesajını sohbet geçmişine kaydet
-        self.history.append(
-            {
-                "role": "user",
-                "content": user_input
-            }
-        )
-        
-        # Plan oluştur
-        plan = self.planner.plan(user_input)
-        
-        context_text = ""
-        
-        if plan["intent"] == "modify_code":
-            results = self.retriever.retrieve_relevant_chunks(user_input)
+            # Nesne kontrolü
+            text = response.text if hasattr(response, "text") else str(response)
+            print(f"[DEBUG] LLM Yanıtı: {text[:50]}...")
             
-            if results:
-                # En alakalı sonucu bağlam olarak ekle
-                target_file = results[0]["file_path"]
-                file_content = results[0]["chunk"]
+            # 2. Araçları parse et
+            tool_match = re.search(r"\[TOOL:(\w+)\((.*?)\)\]", text)
+            if tool_match:
+                tool_name, tool_args = tool_match.groups()
+                print(f"[DEBUG] Araç tespit edildi: {tool_name}")
                 
-                context_text = f"""
-İLGİLİ DOSYA (RAG):
-{target_file}
-
-DOSYA İÇERİĞİ:
-
-{file_content}
-"""
-        
-        if context_text:
-            self.history.append(
-                {
-                    "role": "system",
-                    "content": context_text
-                }
-            )
-        
-        # 2. Sağlayıcı üzerinden yapay zekaya ateşle (Tüm geçmişi gönderiyoruz)
-        response = self.provider.chat(self.history)
-        
-        # 3. Araç kullanımı kontrolü (Tool Calling)
-        
-        # write_to_file kontrolü
-        write_match = re.search(r"\[TOOL:write_to_file\((.*?),\s*(.*?)\)\]", response, re.DOTALL)
-        if write_match:
-            path = write_match.group(1).strip().strip("'").strip('"')
-            content = write_match.group(2).strip().strip("'").strip('"')
+                # Basit araç switch-case
+                if tool_name == "read_file":
+                    res = read_file(tool_args)
+                elif tool_name == "execute_command":
+                    res = execute_command(tool_args)
+                else:
+                    res = "Bilinmeyen araç."
+                
+                print(f"[DEBUG] Araç sonucu: {res[:50]}...")
+                return res
             
-            # Aracı çalıştır
-            tool_result = write_to_file(path, content)
+            return text
             
-            # Sonucu yanıta ekle
-            response += f"\n\n[Sistem: {tool_result}]"
-            
-        # read_file kontrolü
-        read_match = re.search(r"\[TOOL:read_file\((.*?)\)\]", response, re.DOTALL)
-        if read_match:
-            path = read_match.group(1).strip().strip("'").strip('"')
-            
-            # Aracı çalıştır
-            tool_result = read_file(path)
-            
-            # Sonucu yanıta ekle
-            response += f"\n\n[Sistem: {tool_result}]"
-            
-        # execute_command kontrolü
-        cmd_match = re.search(r"\[TOOL:execute_command\((.*?)\)\]", response, re.DOTALL)
-        if cmd_match:
-            command = cmd_match.group(1).strip().strip("'").strip('"')
-            
-            # Aracı çalıştır
-            tool_result = execute_command(command)
-            
-            # Sonucu yanıta ekle
-            response += f"\n\n[Sistem: {tool_result}]"
-            
-        # search_codebase kontrolü
-        search_match = re.search(r"\[TOOL:search_codebase\((.*?)\)\]", response, re.DOTALL)
-        if search_match:
-            query = search_match.group(1).strip().strip("'").strip('"')
-            
-            # Aracı çalıştır
-            results = self.retriever.retrieve_relevant_chunks(query)
-            
-            # Sonuçları formatla
-            formatted_results = "\n\n".join([f"Dosya: {r['file_path']}\nİçerik: {r['chunk']}" for r in results])
-            tool_result = f"Arama Sonuçları:\n{formatted_results}"
-            
-            # Sonucu yanıta ekle
-            response += f"\n\n[Sistem: {tool_result}]"
-        
-        # 4. Yapay zekanın verdiği cevabı da sohbet geçmişine kaydet
-        self.history.append(
-            {
-                "role": "assistant",
-                "content": response
-            }
-        )
-        
-        return response
-
-    def clear_memory(self):
-        """Ajanın anlık sohbet hafızasını gıcır gıcır sıfırlar."""
-        self.session.reset_session()
-        # Geçmişi de sıfırlayalım
-        self.history = [
-            {
-                "role": "system",
-                "content": self.system_prompt
-            }
-        ]
+        except Exception as e:
+            print("[DEBUG] HATA YAKALANDI!")
+            traceback.print_exc()
+            return f"HATA: {str(e)}"
