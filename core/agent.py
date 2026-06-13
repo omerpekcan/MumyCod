@@ -29,8 +29,9 @@ class MumyCodAgent:
             "1. Dosya oluşturmak veya güncellemek için `write_to_file(filepath, content)` aracını kullanabilirsin.\n"
             "2. Mevcut bir dosyayı okumak için `read_file(filepath)` aracını kullanabilirsin.\n"
             "3. Terminal komutu çalıştırmak için `execute_command(command)` aracını kullanabilirsin.\n"
+            "4. Kod tabanında arama yapmak için `search_codebase(query)` aracını kullanabilirsin.\n"
             "Bunu kullanmak için yanıtında şu formatı kullan:\n"
-            "[TOOL:write_to_file(dosya_yolu, içerik)] veya [TOOL:read_file(dosya_yolu)] veya [TOOL:execute_command(komut)]"
+            "[TOOL:write_to_file(dosya_yolu, içerik)] veya [TOOL:read_file(dosya_yolu)] veya [TOOL:execute_command(komut)] veya [TOOL:search_codebase(sorgu)]"
         )
         
         # Hafıza şefini başlatıyoruz
@@ -84,22 +85,20 @@ class MumyCodAgent:
         context_text = ""
         
         if plan["intent"] == "modify_code":
-            results = self.retriever.retrieve(user_input)
+            results = self.retriever.retrieve_relevant_chunks(user_input)
             
             if results:
-                target_file = results[0]
-                
-                file_content = self.file_reader.read(
-                    target_file
-                )
+                # En alakalı sonucu bağlam olarak ekle
+                target_file = results[0]["file_path"]
+                file_content = results[0]["chunk"]
                 
                 context_text = f"""
-İLGİLİ DOSYA:
+İLGİLİ DOSYA (RAG):
 {target_file}
 
 DOSYA İÇERİĞİ:
 
-{file_content[:4000]}
+{file_content}
 """
         
         if context_text:
@@ -145,6 +144,21 @@ DOSYA İÇERİĞİ:
             
             # Aracı çalıştır
             tool_result = execute_command(command)
+            
+            # Sonucu yanıta ekle
+            response += f"\n\n[Sistem: {tool_result}]"
+            
+        # search_codebase kontrolü
+        search_match = re.search(r"\[TOOL:search_codebase\((.*?)\)\]", response, re.DOTALL)
+        if search_match:
+            query = search_match.group(1).strip().strip("'").strip('"')
+            
+            # Aracı çalıştır
+            results = self.retriever.retrieve_relevant_chunks(query)
+            
+            # Sonuçları formatla
+            formatted_results = "\n\n".join([f"Dosya: {r['file_path']}\nİçerik: {r['chunk']}" for r in results])
+            tool_result = f"Arama Sonuçları:\n{formatted_results}"
             
             # Sonucu yanıta ekle
             response += f"\n\n[Sistem: {tool_result}]"
