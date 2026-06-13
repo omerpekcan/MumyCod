@@ -1,18 +1,28 @@
-import os
-from google import genai
+import math
 
 def get_embedding(text: str) -> list[float]:
     """
-    Gemini text-embedding-004 modelini kullanarak metin için embedding üretir.
+    Metni yerel ve deterministik bir şekilde 128 boyutlu bir vektöre dönüştürür.
+    Herhangi bir API çağrısı yapmaz, tamamen yerel çalışır.
     """
-    api_key = os.getenv("GEMINI_API_KEY")
-    client = genai.Client(api_key=api_key)
+    vector_size = 128
+    vector = [0.0] * vector_size
     
-    # contents parametresini liste olarak gönderiyoruz
-    response = client.models.embed_content(
-        model="text-embedding-004",
-        contents=[text]
-    )
+    if not text:
+        return vector
+
+    # Metni karakter bazlı özellik vektörüne dönüştür (Feature Hashing)
+    for i, char in enumerate(text):
+        # Karakterin ASCII değerini ve pozisyonunu kullanarak deterministik bir indeks oluştur
+        char_val = ord(char)
+        idx = (char_val + i * 31) % vector_size
+        
+        # Vektörü güncelle
+        vector[idx] += 1.0
     
-    # Embedding değerlerini döndür
-    return response.embeddings[0].values
+    # Vektörü normalize et (L2 Norm)
+    norm = math.sqrt(sum(x * x for x in vector))
+    if norm > 0:
+        vector = [x / norm for x in vector]
+    
+    return vector
