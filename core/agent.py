@@ -44,7 +44,7 @@ class MumyCodAgent:
         # Dosya okuyucu
         self.file_reader = FileReader()
         
-        # Sohbet geçmişi
+        # Sohbet geçmişi (Memory)
         self.history = [
             {
                 "role": "system",
@@ -100,7 +100,7 @@ DOSYA İÇERİĞİ:
                 }
             )
         
-        # 2. Sağlayıcı üzerinden yapay zekaya ateşle
+        # 2. Sağlayıcı üzerinden yapay zekaya ateşle (Tüm geçmişi gönderiyoruz)
         response = self.provider.chat(self.history)
         
         # 3. Yapay zekanın verdiği cevabı da sohbet geçmişine kaydet
@@ -116,3 +116,10 @@ DOSYA İÇERİĞİ:
     def clear_memory(self):
         """Ajanın anlık sohbet hafızasını gıcır gıcır sıfırlar."""
         self.session.reset_session()
+        # Geçmişi de sıfırlayalım
+        self.history = [
+            {
+                "role": "system",
+                "content": self.system_prompt
+            }
+        ]
