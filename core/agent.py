@@ -1,4 +1,5 @@
 import os
+import re
 from typing import List, Dict, Any
 from llm.deepseek_provider import DeepSeekProvider
 from core.session_manager import SessionManager
@@ -6,6 +7,7 @@ from core.planner import Planner
 from indexing.symbol_index import SymbolIndexer
 from retrieval.retriever import CodeRetriever
 from tools.file_reader import FileReader
+from tools.file_tools import write_to_file
 
 
 class MumyCodAgent:
@@ -21,7 +23,10 @@ class MumyCodAgent:
             "Kullanıcıya kodlama yolculuğunda yardım ediyorsun. Yanıtların net, "
             "doğru, üretim için hazır ve çözüm odaklı olmalı. Kod bloklarını her zaman "
             "standart markdown formatında (```csharp vb.) vermeye özen göster. Uzun "
-            "ve alakasız açıklamalardan kaçın."
+            "ve alakasız açıklamalardan kaçın.\n\n"
+            "ARAÇLAR:\n"
+            "Dosya oluşturmak veya güncellemek için `write_to_file(filepath, content)` aracını kullanabilirsin.\n"
+            "Bunu kullanmak için yanıtında şu formatı kullan: [TOOL:write_to_file(dosya_yolu, içerik)]"
         )
         
         # Hafıza şefini başlatıyoruz
@@ -103,7 +108,21 @@ DOSYA İÇERİĞİ:
         # 2. Sağlayıcı üzerinden yapay zekaya ateşle (Tüm geçmişi gönderiyoruz)
         response = self.provider.chat(self.history)
         
-        # 3. Yapay zekanın verdiği cevabı da sohbet geçmişine kaydet
+        # 3. Araç kullanımı kontrolü (Tool Calling)
+        # [TOOL:write_to_file(path, content)] formatını ara
+        tool_match = re.search(r"\[TOOL:write_to_file\((.*?),\s*(.*?)\)\]", response, re.DOTALL)
+        
+        if tool_match:
+            path = tool_match.group(1).strip().strip("'").strip('"')
+            content = tool_match.group(2).strip().strip("'").strip('"')
+            
+            # Aracı çalıştır
+            tool_result = write_to_file(path, content)
+            
+            # Sonucu yanıta ekle
+            response += f"\n\n[Sistem: {tool_result}]"
+        
+        # 4. Yapay zekanın verdiği cevabı da sohbet geçmişine kaydet
         self.history.append(
             {
                 "role": "assistant",
