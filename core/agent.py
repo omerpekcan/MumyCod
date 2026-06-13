@@ -10,7 +10,8 @@ class MumyCodAgent:
     def __init__(self):
         print("[DEBUG] MumyCodAgent başlatılıyor...")
         self.provider = GeminiProvider()
-        self.retriever = CodeRetriever()
+        # brain.json dosyasının doğru yolda olduğundan emin oluyoruz
+        self.retriever = CodeRetriever(brain_path="memory/brain.json")
         self.history = []
         print("[DEBUG] MumyCodAgent başarıyla başlatıldı.")
 
@@ -26,21 +27,27 @@ class MumyCodAgent:
             # Nesne kontrolü
             text = response.text if hasattr(response, "text") else str(response)
             print(f"[DEBUG] LLM'den yanıt alındı. Yanıt uzunluğu: {len(text)} karakter.")
-            print(f"[DEBUG] Yanıt içeriği: {text[:100]}...")
             
-            # 2. Araçları parse et
+            # 2. Araçları parse et (Daha esnek regex)
             tool_match = re.search(r"\[TOOL:(\w+)\((.*?)\)\]", text)
             if tool_match:
                 tool_name, tool_args = tool_match.groups()
+                # Argümanlardaki tırnakları temizle
+                tool_args = tool_args.strip("'").strip('"')
+                
                 print(f"[DEBUG] Araç tespit edildi: {tool_name}, Argümanlar: {tool_args}")
                 
-                # Basit araç switch-case
+                # Araçları işle
                 if tool_name == "read_file":
                     print(f"[DEBUG] read_file aracı çalıştırılıyor...")
                     res = read_file(tool_args)
                 elif tool_name == "execute_command":
                     print(f"[DEBUG] execute_command aracı çalıştırılıyor...")
                     res = execute_command(tool_args)
+                elif tool_name == "search_codebase":
+                    print(f"[DEBUG] search_codebase aracı çalıştırılıyor...")
+                    results = self.retriever.retrieve_relevant_chunks(tool_args)
+                    res = "\n".join([f"Dosya: {r['file_path']}\nİçerik: {r['text']}" for r in results])
                 else:
                     res = f"Bilinmeyen araç: {tool_name}"
                     print(f"[DEBUG] {res}")
