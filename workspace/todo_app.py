@@ -1,14 +1,15 @@
+```python
+# workspace/todo_app.py
+
 import json
 import os
 
-TODO_FILE = "todos.json"
+TODO_FILE = 'todos.json'
 
 def load_todos():
-    """
-    todos.json dosyasından görevleri yükler. Dosya yoksa boş bir liste döndürür.
-    """
+    \"\"\"JSON dosyasından görevleri yükler.\"\"\"
     if os.path.exists(TODO_FILE):
-        with open(TODO_FILE, 'r') as f:
+        with open(TODO_FILE, 'r', encoding='utf-8') as f:
             try:
                 return json.load(f)
             except json.JSONDecodeError:
@@ -16,82 +17,63 @@ def load_todos():
     return []
 
 def save_todos(todos):
-    """
-    Görev listesini todos.json dosyasına kaydeder.
-    """
-    with open(TODO_FILE, 'w') as f:
-        json.dump(todos, f, indent=4)
+    \"\"\"Görevleri JSON dosyasına kaydeder.\"\"\"
+    with open(TODO_FILE, 'w', encoding='utf-8') as f:
+        json.dump(todos, f, indent=4, ensure_ascii=False)
 
-def add_todo(description):
-    """
-    Yeni bir görev ekler.
-    """
+def add_todo(task):
+    \"\"\"Yeni bir görev ekler.\"\"\"
     todos = load_todos()
-    todos.append({"id": len(todos) + 1, "description": description, "done": False})
+    todos.append({"id": len(todos) + 1, "task": task, "completed": False})
     save_todos(todos)
-    print(f"Görev eklendi: '{description}'")
+    print(f"Görev '{task}' eklendi.")
 
 def list_todos():
-    """
-    Tüm görevleri listeler.
-    """
+    \"\"\"Tüm görevleri listeler.\"\"\"
     todos = load_todos()
     if not todos:
-        print("Henüz hiç görev yok.")
+        print("Henüz hiç görev yok!")
         return
-    print("Yapılacaklar Listesi:")
+    print("Görevler:")
     for todo in todos:
-        status = "[x]" if todo["done"] else "[ ]"
-        print(f"{todo['id']}. {status} {todo['description']}")
+        status = "[X]" if todo["completed"] else "[ ]"
+        print(f"{todo['id']}. {status} {todo['task']}")
 
 def delete_todo(todo_id):
-    """
-    Belirtilen ID'ye sahip görevi siler.
-    """
+    \"\"\"Belirtilen ID'ye sahip görevi siler.\"\"\"
     todos = load_todos()
     initial_length = len(todos)
-    todos = [todo for todo in todos if todo["id"] != todo_id]
+    todos = [todo for todo in todos if todo['id'] != todo_id]
     if len(todos) < initial_length:
-        # ID'leri yeniden düzenle
-        for i, todo in enumerate(todos):
-            todo["id"] = i + 1
         save_todos(todos)
-        print(f"Görev {todo_id} silindi.")
+        print(f"Görev ID {todo_id} silindi.")
     else:
-        print(f"Görev {todo_id} bulunamadı.")
+        print(f"Görev ID {todo_id} bulunamadı.")
 
 def main():
-    """
-    Uygulamanın ana fonksiyonu, komut satırı argümanlarını işler.
-    """
-    import sys
-    if len(sys.argv) < 2:
-        print("Kullanım: python todo_app.py <komut> [argümanlar]")
-        print("Komutlar: add, list, delete")
-        return
+    \"\"\"Uygulamanın ana giriş noktası.\"\"\"
+    while True:
+        command = input("Komut girin (ekle, listele, sil, çık): ").lower().split(maxsplit=1)
+        action = command[0]
 
-    command = sys.argv[1].lower()
-
-    if command == "add":
-        if len(sys.argv) < 3:
-            print("Kullanım: python todo_app.py add <görev_açıklaması>")
+        if action == "ekle":
+            if len(command) > 1:
+                add_todo(command[1])
+            else:
+                print("Ekle komutu için bir görev metni belirtin.")
+        elif action == "listele":
+            list_todos()
+        elif action == "sil":
+            if len(command) > 1 and command[1].isdigit():
+                delete_todo(int(command[1]))
+            else:
+                print("Sil komutu için geçerli bir görev ID'si belirtin.")
+        elif action == "çık":
+            print("Uygulamadan çıkılıyor.")
+            break
         else:
-            description = " ".join(sys.argv[2:])
-            add_todo(description)
-    elif command == "list":
-        list_todos()
-    elif command == "delete":
-        if len(sys.argv) < 3:
-            print("Kullanım: python todo_app.py delete <görev_id>")
-        else:
-            try:
-                todo_id = int(sys.argv[2])
-                delete_todo(todo_id)
-            except ValueError:
-                print("Geçersiz görev ID. Lütfen bir sayı girin.")
-    else:
-        print(f"Bilinmeyen komut: {command}")
-        print("Kullanılabilir komutlar: add, list, delete")
+            print("Geçersiz komut. Lütfen 'ekle', 'listele', 'sil' veya 'çık' komutlarından birini kullanın.")
 
 if __name__ == "__main__":
     main()
+```

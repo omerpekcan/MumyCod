@@ -22,7 +22,7 @@ class SymbolIndexer:
                 try:
                     with open(
                   file_path,
-                   "r",
+                  "r",
                   encoding="utf-8",
                   errors="ignore"
                   ) as f:
