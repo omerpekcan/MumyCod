@@ -25,3 +25,7 @@ def test_final():
 
 if __name__ == "__main__":
     test_final()
+
+# Test: Dosyaya yazma yeteneği
+response = agent.ask("[TOOL:write_file(test_dosyasi.txt, 'Ajanım artık kendi dosyalarını yazabiliyor!')]")
+print(f"Yazma sonucu: {response}")
