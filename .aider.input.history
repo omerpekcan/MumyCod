@@ -779,3 +779,14 @@
 
 # 2026-06-13 22:59:41.886108
 +y
+
+# 2026-06-13 23:15:35.240502
++tüm komut satırı arayüzünü tamamen Türkçe yapalım. core/agent.py içinde şunları yap:
++
++    Komut Sözlüğü Oluştur: Bir sözlük tanımla: COMMAND_MAP = {'/çıkış': 'exit', '/sağlayıcı': 'provider', '/model': 'model', '/temizle': 'clear', '/durum': 'status'}.
++
++    handle_command metodunda, kullanıcıdan gelen her girdiyi önce bu COMMAND_MAP üzerinden geçir. Eğer kullanıcı /sağlayıcı yazarsa, bunu arka planda sistemin anlayacağı provider komutuna çevir.
++
++    Yanıtları Türkçeleştir: Ajanın sistem mesajlarını ve hata çıktılarını (örneğin 'Unknown command' yerine 'Bilinmeyen komut') tamamen Türkçe'ye çevir.
++
++    Arayüz Etiketi: Sistemin başlangıç mesajını 'MumyCod Terminal Başlatıldı' ve kullanıcıdan giriş alma kısmını 'Kullanıcı >>' olarak güncelle."
