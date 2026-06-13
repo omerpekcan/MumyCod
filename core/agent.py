@@ -16,7 +16,7 @@ class MumyCodAgent:
     Hafızayı ve LLM sağlayıcısını koordine eder.
     """
     
-    def __init__(self, model_name: str = "gemini-1.5-flash-lite"):
+    def __init__(self, model_name: str = "gemini-2.5-flash-lite"):
         # Yapay zekaya nasıl davranması gerektiğini dikte eden sistem talimatı
         self.system_prompt = (
             "MumyCod: İleri düzeyde, zeki ve yüksek kapasiteli bir AI kodlama asistanısın.\n"
