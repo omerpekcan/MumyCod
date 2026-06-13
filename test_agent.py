@@ -14,7 +14,13 @@ def test_file_operations():
     prompt2 = "'test_output.txt' dosyasının içeriğini 'Yeni otonom okuma ve yazma testi başarılı!' olarak güncelle."
     print(f"Soru: {prompt2}")
     response2 = agent.ask(prompt2)
-    print(f"Cevap: {response2}")
+    print(f"Cevap: {response2}\n")
+    
+    print("--- 3. Terminal Komut Testi ---")
+    prompt3 = "Bana projenin kök dizinindeki (C:\\Users\\Mumy\\MumyCod) dosyaları listele."
+    print(f"Soru: {prompt3}")
+    response3 = agent.ask(prompt3)
+    print(f"Cevap: {response3}")
 
 if __name__ == "__main__":
     test_file_operations()
