@@ -36,66 +36,78 @@ class MumyCodAgent:
         )
         print("[DEBUG] MumyCodAgent başarıyla başlatıldı.")
 
+    def _execute_tool(self, tool_name: str, tool_args: str) -> str:
+        """Araçları çalıştıran yardımcı metod."""
+        print(f"[DEBUG] Araç çalıştırılıyor: {tool_name}, Argümanlar: {tool_args}")
+        
+        if tool_name == "write_file":
+            # write_file için argümanları virgülle ayır
+            parts = tool_args.split(',', 1)
+            if len(parts) == 2:
+                path = parts[0].strip().strip("'").strip('"')
+                content = parts[1].strip().strip("'").strip('"')
+                return write_file(path, content)
+            return "Hata: write_file için dosya_yolu ve içerik gerekli."
+        
+        elif tool_name == "read_file":
+            return read_file(tool_args.strip("'").strip('"'))
+        
+        elif tool_name == "execute_command":
+            return execute_command(tool_args.strip("'").strip('"'))
+        
+        elif tool_name == "search_codebase":
+            results = self.retriever.retrieve_relevant_chunks(tool_args.strip("'").strip('"'))
+            return "\n".join([f"Dosya: {r['file_path']}\nİçerik: {r['text']}" for r in results])
+        
+        elif tool_name == "git_commit":
+            return self.git_tools.git_commit(tool_args.strip("'").strip('"'))
+        
+        elif tool_name == "git_push":
+            return self.git_tools.git_push()
+        
+        return f"Bilinmeyen araç: {tool_name}"
+
     def ask(self, user_query: str) -> str:
         print(f"\n[DEBUG] --- ask() metodu çağrıldı ---")
         print(f"[DEBUG] Soru: {user_query}")
         
         try:
-            # 1. LLM'e sor (ProviderManager üzerinden)
-            print("[DEBUG] LLM'e istek gönderiliyor (provider_manager.ask)...")
-            response = self.provider_manager.ask(user_query)
-            
-            # Nesne kontrolü
-            text = response
-            print(f"[DEBUG] LLM'den yanıt alındı. Yanıt uzunluğu: {len(text)} karakter.")
+            # 1. LLM'e sor
+            print("[DEBUG] LLM'e istek gönderiliyor...")
+            response_text = self.provider_manager.ask(user_query)
+            print(f"[DEBUG] LLM'den yanıt alındı.")
             
             # 2. Araçları parse et
-            
             # write_file için özel regex (iki argümanlı, çok satırlı içerik destekli)
-            write_match = re.search(r"\[TOOL:write_file\((.*?),\s*(.*?)\)\]", text, re.DOTALL)
+            write_match = re.search(r"\[TOOL:write_file\((.*?),\s*(.*?)\)\]", response_text, re.DOTALL)
+            
+            tool_name = None
+            tool_args = None
+            
             if write_match:
-                path, content = write_match.groups()
-                path = path.strip("'").strip('"')
-                content = content.strip("'").strip('"')
-                print(f"[DEBUG] Araç tespit edildi: write_file, Dosya: {path}")
-                res = write_file(path, content)
-                return res
-
-            # Diğer araçlar için regex
-            tool_match = re.search(r"\[TOOL:(\w+)\((.*?)\)\]", text)
-            if tool_match:
-                tool_name, tool_args = tool_match.groups()
-                # Argümanlardaki tırnakları temizle
-                tool_args = tool_args.strip("'").strip('"')
+                tool_name = "write_file"
+                tool_args = f"{write_match.group(1)}, {write_match.group(2)}"
+            else:
+                # Diğer araçlar için regex
+                tool_match = re.search(r"\[TOOL:(\w+)\((.*?)\)\]", response_text, re.DOTALL)
+                if tool_match:
+                    tool_name, tool_args = tool_match.groups()
+            
+            if tool_name:
+                print(f"[DEBUG] Araç tespit edildi: {tool_name}")
                 
-                print(f"[DEBUG] Araç tespit edildi: {tool_name}, Argümanlar: {tool_args}")
+                # Aracı çalıştır
+                tool_result = self._execute_tool(tool_name, tool_args)
+                print(f"[DEBUG] Araç sonucu: {tool_result[:100]}...")
                 
-                # Araçları işle
-                if tool_name == "read_file":
-                    print(f"[DEBUG] read_file aracı çalıştırılıyor...")
-                    res = read_file(tool_args)
-                elif tool_name == "execute_command":
-                    print(f"[DEBUG] execute_command aracı çalıştırılıyor...")
-                    res = execute_command(tool_args)
-                elif tool_name == "search_codebase":
-                    print(f"[DEBUG] search_codebase aracı çalıştırılıyor...")
-                    results = self.retriever.retrieve_relevant_chunks(tool_args)
-                    res = "\n".join([f"Dosya: {r['file_path']}\nİçerik: {r['text']}" for r in results])
-                elif tool_name == "git_commit":
-                    print(f"[DEBUG] git_commit aracı çalıştırılıyor...")
-                    res = self.git_tools.git_commit(tool_args)
-                elif tool_name == "git_push":
-                    print(f"[DEBUG] git_push aracı çalıştırılıyor...")
-                    res = self.git_tools.git_push()
-                else:
-                    res = f"Bilinmeyen araç: {tool_name}"
-                    print(f"[DEBUG] {res}")
-                
-                print(f"[DEBUG] Araç sonucu: {res[:100]}...")
-                return res
+                # 3. Sonucu LLM'e geri gönder ve özetlet
+                final_prompt = f"Kullanıcı sorusu: '{user_query}'.\n\nAraç '{tool_name}' çalıştırıldı. Sonuç:\n{tool_result}\n\nLütfen bu sonucu kullanıcıya özetle."
+                print("[DEBUG] Araç sonucu LLM'e özetletiliyor...")
+                final_response = self.provider_manager.ask(final_prompt)
+                return final_response
             
             print("[DEBUG] Araç tespit edilmedi, doğrudan yanıt dönülüyor.")
-            return text
+            return response_text
             
         except Exception as e:
             print("[DEBUG] !!! HATA YAKALANDI !!!")
