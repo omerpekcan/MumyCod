@@ -4,12 +4,11 @@ def test_agent_workflow():
     # Ajanı başlat
     agent = MumyCodAgent()
     
-    print("--- Ajan İş Akışı Testi: Kod Analizi ve İyileştirme ---")
+    print("--- Ajan İş Akışı Testi: Çok Adımlı Yazılım Geliştirme ---")
     prompt = (
-        "Projedeki 'tools/terminal_tools.py' dosyasını oku. "
-        "İçindeki kod yapısını incele, Windows encoding (karakter kodlama) yönetiminin "
-        "doğru yapılıp yapılmadığını kontrol et ve eğer kodda iyileştirilecek bir yer varsa "
-        "dosyayı 'write_to_file' kullanarak güncelle. Sonucu bana raporla."
+        "Lütfen 'workspace' dizini altında 'todo_app.py' adında bir Python dosyası oluştur. "
+        "İçine görev ekleme, listeleme ve silme özelliklerine sahip çalışan bir CLI Todo uygulaması kodu yaz. "
+        "Ardından 'execute_command' aracını kullanarak bu yeni dosyayı çalıştır ve uygulamanın hatasız çalıştığını bana raporla."
     )
     
     print(f"Soru: {prompt}\n")
