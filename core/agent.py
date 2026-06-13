@@ -78,16 +78,23 @@ class MumyCodAgent:
             print(f"[DEBUG] LLM'den yanıt alındı.")
             
             # 2. Araçları parse et
-            # Regex: [TOOL:isim(argümanlar)]
+            # Esnek regex: [TOOL:isim(argümanlar)]
             # re.DOTALL ile çok satırlı içerikleri yakalıyoruz
             tool_match = re.search(r"\[TOOL:(\w+)\((.*?)\)\]", response_text, re.DOTALL)
             
             if tool_match:
                 tool_name, tool_args = tool_match.groups()
-                print(f"[DEBUG] Araç tespit edildi: {tool_name}")
+                
+                # Argümanları temizle (tırnakları ve olası etiketleri kaldır)
+                # Sadece dış tırnakları değil, içerideki olası path= gibi etiketleri de temizlemek için
+                # basit bir temizleme yapıyoruz
+                cleaned_args = tool_args.strip().strip("'").strip('"')
+                
+                print(f"[DEBUG] Tetiklenen Araç: {tool_name}")
+                print(f"[DEBUG] Temizlenmiş Argümanlar: {cleaned_args}")
                 
                 # Aracı çalıştır
-                tool_result = self._execute_tool(tool_name, tool_args)
+                tool_result = self._execute_tool(tool_name, cleaned_args)
                 print(f"[DEBUG] Araç sonucu: {tool_result[:100]}...")
                 
                 # 3. Sonucu LLM'e geri gönder ve özetlet
