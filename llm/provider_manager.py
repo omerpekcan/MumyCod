@@ -46,26 +46,58 @@ class ProviderManager:
             print("[DEBUG] OpenRouter istemcisi başlatılamadı (API anahtarı yok)")
 
     def _handle_error(self, e, provider_name):
-        """Hata türünü analiz eder ve aksiyon belirler."""
+        """Hata türünü analiz eder, neden ve aksiyon belirler."""
         status_code = getattr(e, 'status_code', getattr(e, 'code', 0))
+        error_type = type(e).__name__
+        error_msg = str(e).lower()
         
-        # 429 ve 503 hatalarında hemen bir sonrakine geçmek istiyoruz (retry yok)
+        print(f"[DEBUG] {provider_name} hata detayı - Tip: {error_type}, Kod: {status_code}")
+        
+        # 429 (Rate Limit) ve 503 (Service Unavailable) hatalarında
         if status_code in [429, 503]:
-            print(f"[DEBUG] {provider_name} {status_code} hatası verdi. Bir sonraki sağlayıcıya geçiliyor.")
+            reason = "Rate limit aşıldı" if status_code == 429 else "Servis geçici olarak kullanılamıyor"
+            print(f"[DEBUG] {provider_name} {status_code} hatası: {reason}. Bir sonraki sağlayıcıya geçiliyor.")
             return "NEXT"
+        
+        # 401 (Unauthorized) ve 404 (Not Found) hatalarında blacklist
         elif status_code in [401, 404]:
-            print(f"[DEBUG] {provider_name} {status_code} hatası verdi. Blacklist'e alınıyor.")
+            reason = "API anahtarı geçersiz veya yanlış" if status_code == 401 else "Endpoint bulunamadı"
+            print(f"[DEBUG] {provider_name} {status_code} hatası: {reason}. Blacklist'e alınıyor.")
             self.blacklist.add(provider_name)
             return "BLACKLIST"
         
-        print(f"[DEBUG] {provider_name} beklenmedik hata: {str(e)}")
-        return "FAIL"
+        # Connection hatalarında
+        elif "connectionerror" in error_type.lower() or "timeout" in error_msg:
+            print(f"[DEBUG] {provider_name} bağlantı hatası: Ağ problemi veya timeout. Bir sonraki sağlayıcıya geçiliyor.")
+            return "NEXT"
+        
+        # Authentication hatalarında
+        elif "authentication" in error_msg or "unauthenticated" in error_msg:
+            print(f"[DEBUG] {provider_name} kimlik doğrulama hatası: API anahtarı geçersiz. Blacklist'e alınıyor.")
+            self.blacklist.add(provider_name)
+            return "BLACKLIST"
+        
+        # Type hatalarında (model/params yanlış)
+        elif "typeerror" in error_type.lower():
+            print(f"[DEBUG] {provider_name} tip hatası: Model veya parametreler yanlış. Blacklist'e alınıyor.")
+            self.blacklist.add(provider_name)
+            return "BLACKLIST"
+        
+        # Diğer hatalar
+        else:
+            print(f"[DEBUG] {provider_name} beklenmedik hata: {error_type} - {str(e)}")
+            return "FAIL"
 
     def ask(self, prompt: str) -> str:
         """
         Sağlayıcılar arasında döngü kurar ve hata durumunda bir sonrakine geçer.
+        Detaylı hata raporlaması yaparak feedback sağlar.
         """
         print("[DEBUG] Prompt işlenmek üzere sağlayıcılara gönderiliyor...")
+        print(f"[DEBUG] Prompt uzunluğu: {len(prompt)} karakter")
+        
+        last_error = None
+        attempted_providers = []
         
         for provider in self.providers:
             if provider["name"] in self.blacklist:
@@ -76,8 +108,10 @@ class ProviderManager:
                 print(f"[DEBUG] {provider['name']} için API anahtarı yok, atlaniyor.")
                 continue
             
+            attempted_providers.append(provider["name"])
+            
             try:
-                print(f"[DEBUG] {provider['name']} ile deneniyor...")
+                print(f"[DEBUG] {provider['name']} ile deneniyor... (Girişim: {len(attempted_providers)}/{len([p for p in self.providers if p['api_key']])})")
                 
                 if provider["name"] == "gemini":
                     print(f"[DEBUG] Gemini API'sine istek gönderiliyor (model: gemini-3.5-flash)...")
@@ -85,7 +119,7 @@ class ProviderManager:
                         model="models/gemini-3.5-flash",
                         contents=prompt
                     )
-                    print(f"[DEBUG] Gemini başarıyla yanıt verdi")
+                    print(f"[DEBUG] Gemini başarıyla yanıt verdi (Yanıt uzunluğu: {len(response.text)} karakter)")
                     return response.text
                     
                 elif provider["name"] == "groq":
@@ -94,8 +128,9 @@ class ProviderManager:
                         messages=[{"role": "user", "content": prompt}],
                         model="llama-3.3-70b-versatile",
                     )
-                    print(f"[DEBUG] Groq başarıyla yanıt verdi")
-                    return chat_completion.choices[0].message.content
+                    response_content = chat_completion.choices[0].message.content
+                    print(f"[DEBUG] Groq başarıyla yanıt verdi (Yanıt uzunluğu: {len(response_content)} karakter)")
+                    return response_content
                     
                 elif provider["name"] == "openrouter":
                     print(f"[DEBUG] OpenRouter API'sine istek gönderiliyor (model: google/gemini-2.0-flash-lite-preview:free)...")
@@ -103,14 +138,31 @@ class ProviderManager:
                         model="google/gemini-2.0-flash-lite-preview:free",
                         messages=[{"role": "user", "content": prompt}]
                     )
-                    print(f"[DEBUG] OpenRouter başarıyla yanıt verdi")
-                    return completion.choices[0].message.content
+                    response_content = completion.choices[0].message.content
+                    print(f"[DEBUG] OpenRouter başarıyla yanıt verdi (Yanıt uzunluğu: {len(response_content)} karakter)")
+                    return response_content
             
             except Exception as e:
+                last_error = e
                 print(f"[DEBUG] {provider['name']} hata fırlattı: {type(e).__name__}")
                 action = self._handle_error(e, provider["name"])
-                # Hata durumunda döngü bir sonraki sağlayıcıya devam eder
+                
+                if action == "BLACKLIST":
+                    print(f"[DEBUG] {provider['name']} blacklist'e eklendi, diğer sağlayıcılar deneniyor...")
+                elif action == "NEXT":
+                    print(f"[DEBUG] {provider['name']} başarısız, bir sonraki sağlayıcıya geçiliyor...")
+                else:
+                    print(f"[DEBUG] {provider['name']} başarısız (FAIL), bir sonraki sağlayıcıya geçiliyor...")
+                
                 continue
         
         print("[DEBUG] Tüm sağlayıcılar başarısız oldu.")
-        raise Exception("Tüm sağlayıcılar başarısız oldu.")
+        print(f"[DEBUG] Denenen sağlayıcılar: {', '.join(attempted_providers)}")
+        
+        if last_error:
+            error_msg = f"Tüm sağlayıcılar başarısız oldu. Son hata: {type(last_error).__name__} - {str(last_error)}"
+        else:
+            error_msg = "Tüm sağlayıcılar başarısız oldu. (Kullanılabilir sağlayıcı yok)"
+        
+        print(f"[DEBUG] {error_msg}")
+        raise Exception(error_msg)
