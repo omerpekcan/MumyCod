@@ -20,7 +20,13 @@ def test_file_operations():
     prompt3 = "Bana projenin kök dizinindeki (C:\\Users\\Mumy\\MumyCod) dosyaları listele."
     print(f"Soru: {prompt3}")
     response3 = agent.ask(prompt3)
-    print(f"Cevap: {response3}")
+    print(f"Cevap: {response3}\n")
+    
+    print("--- 4. Otomatik Proje Temizliği ---")
+    prompt4 = "Projenin kök dizinindeki 0 baytlık gereksiz tüm hayalet dosyaları tespit et ve 'execute_command' tool'unu kullanarak (Windows'un 'del' komutu ile) güvenli bir şekilde sil, temizle."
+    print(f"Soru: {prompt4}")
+    response4 = agent.ask(prompt4)
+    print(f"Cevap: {response4}")
 
 if __name__ == "__main__":
     test_file_operations()
