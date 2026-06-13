@@ -36,39 +36,50 @@ class MumyCodAgent:
         )
         print("[DEBUG] MumyCodAgent başarıyla başlatıldı.")
 
-    def _execute_tool(self, tool_name: str, tool_args: str) -> str:
-        """Araçları çalıştıran yardımcı metod."""
-        print(f"[DEBUG] Araç çalıştırılıyor: {tool_name}, Argümanlar: {tool_args}")
-        
-        # Argümanları temizle: path=, content=, message= gibi etiketleri ve tırnakları kaldır
-        cleaned_args = tool_args.replace('path=', '').replace('content=', '').replace('message=', '').replace('"', '').replace("'", '').strip()
-        
-        if tool_name == "write_file":
-            # write_file için argümanları virgülle ayır (ilk virgül dosya yolu, sonrası içerik)
-            parts = tool_args.split(',', 1)
-            if len(parts) == 2:
-                path = parts[0].replace('path=', '').strip().strip("'").strip('"')
-                content = parts[1].replace('content=', '').strip().strip("'").strip('"')
-                return write_file(path, content)
-            return "Hata: write_file için dosya_yolu ve içerik gerekli."
-        
-        elif tool_name == "read_file":
-            return read_file(cleaned_args)
-        
-        elif tool_name == "execute_command":
-            return execute_command(cleaned_args)
-        
-        elif tool_name == "search_codebase":
-            results = self.retriever.retrieve_relevant_chunks(cleaned_args)
-            return "\n".join([f"Dosya: {r['file_path']}\nİçerik: {r['text']}" for r in results])
-        
-        elif tool_name == "git_commit":
-            return self.git_tools.git_commit(cleaned_args)
-        
-        elif tool_name == "git_push":
-            return self.git_tools.git_push()
-        
-        return f"Bilinmeyen araç: {tool_name}"
+    def _execute_tool(self, tool_call: str) -> str:
+        """
+        Basit string ayrıştırma ile araçları çalıştırır.
+        tool_call formatı: name(args)
+        """
+        try:
+            # name(args) -> name, args
+            if "(" not in tool_call or ")" not in tool_call:
+                return "Hata: Geçersiz araç formatı."
+            
+            tool_name = tool_call.split('(')[0].strip()
+            tool_args = tool_call.split('(', 1)[1].rsplit(')', 1)[0].strip()
+            
+            print(f"[DEBUG] Tetiklenen Araç: {tool_name}")
+            print(f"[DEBUG] Temizlenmiş Argümanlar: {tool_args}")
+            
+            if tool_name == "write_file":
+                parts = tool_args.split(',', 1)
+                if len(parts) == 2:
+                    path = parts[0].strip().strip("'").strip('"')
+                    content = parts[1].strip().strip("'").strip('"')
+                    return write_file(path, content)
+                return "Hata: write_file için dosya_yolu ve içerik gerekli."
+            
+            elif tool_name == "read_file":
+                return read_file(tool_args.strip("'").strip('"'))
+            
+            elif tool_name == "execute_command":
+                return execute_command(tool_args.strip("'").strip('"'))
+            
+            elif tool_name == "search_codebase":
+                results = self.retriever.retrieve_relevant_chunks(tool_args.strip("'").strip('"'))
+                return "\n".join([f"Dosya: {r['file_path']}\nİçerik: {r['text']}" for r in results])
+            
+            elif tool_name == "git_commit":
+                return self.git_tools.git_commit(tool_args.strip("'").strip('"'))
+            
+            elif tool_name == "git_push":
+                return self.git_tools.git_push()
+            
+            return f"Bilinmeyen araç: {tool_name}"
+            
+        except Exception as e:
+            return f"Araç çalıştırılırken hata oluştu: {str(e)}"
 
     def ask(self, user_query: str) -> str:
         print(f"\n[DEBUG] --- ask() metodu çağrıldı ---")
@@ -77,32 +88,29 @@ class MumyCodAgent:
         try:
             # 1. LLM'e sor
             print("[DEBUG] LLM'e istek gönderiliyor...")
-            response_text = self.provider_manager.ask(user_query)
-            print(f"[DEBUG] LLM'den yanıt alındı.")
+            response = self.provider_manager.ask(user_query)
+            print(f"[DEBUG] LLM'den gelen ham cevap: {response}")
             
-            # 2. Araçları parse et
-            # re.findall ile tüm araç desenlerini yakala
-            tools = re.findall(r'\[TOOL:(\w+)\((.*?)\)\]', response_text, re.DOTALL)
-            
-            if tools:
-                # İlk bulunan aracı işle
-                tool_name, tool_args = tools[0]
-                
-                print(f"[DEBUG] Tetiklenen Araç: {tool_name}")
-                print(f"[DEBUG] Temizlenmiş Argümanlar: {tool_args}")
-                
-                # Aracı çalıştır
-                tool_result = self._execute_tool(tool_name, tool_args)
-                print(f"[DEBUG] Araç sonucu: {tool_result[:100]}...")
-                
-                # 3. Sonucu LLM'e geri gönder ve özetlet
-                final_prompt = f"Kullanıcı sorusu: '{user_query}'.\n\nAraç '{tool_name}' çalıştırıldı. Sonuç:\n{tool_result}\n\nLütfen bu sonucu kullanıcıya özetle."
-                print("[DEBUG] Araç sonucu LLM'e özetletiliyor...")
-                final_response = self.provider_manager.ask(final_prompt)
-                return final_response
+            # 2. Araçları basitçe parse et
+            if "[TOOL:" in response:
+                try:
+                    # [TOOL:name(args)] -> name(args)
+                    tool_call = response.split("[TOOL:")[1].split("]")[0]
+                    
+                    # Aracı çalıştır
+                    result = self._execute_tool(tool_call)
+                    
+                    # 3. Sonucu LLM'e geri gönder ve özetlet
+                    final_prompt = f"Kullanıcı sorusu: '{user_query}'.\n\nAraç çalıştırıldı. Sonuç:\n{result}\n\nLütfen bu sonucu kullanıcıya özetle."
+                    print("[DEBUG] Araç sonucu LLM'e özetletiliyor...")
+                    final_response = self.provider_manager.ask(final_prompt)
+                    return final_response
+                except Exception as e:
+                    print(f"[DEBUG] Araç ayrıştırma hatası: {e}")
+                    return f"Araç çalıştırılamadı: {str(e)}"
             
             print("[DEBUG] Araç tespit edilmedi, doğrudan yanıt dönülüyor.")
-            return response_text
+            return response
             
         except Exception as e:
             print("[DEBUG] !!! HATA YAKALANDI !!!")
