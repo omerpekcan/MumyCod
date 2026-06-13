@@ -40,27 +40,30 @@ class MumyCodAgent:
         """Araçları çalıştıran yardımcı metod."""
         print(f"[DEBUG] Araç çalıştırılıyor: {tool_name}, Argümanlar: {tool_args}")
         
+        # Argümanları temizle: path=, content=, message= gibi etiketleri ve tırnakları kaldır
+        cleaned_args = tool_args.replace('path=', '').replace('content=', '').replace('message=', '').replace('"', '').replace("'", '').strip()
+        
         if tool_name == "write_file":
             # write_file için argümanları virgülle ayır (ilk virgül dosya yolu, sonrası içerik)
             parts = tool_args.split(',', 1)
             if len(parts) == 2:
-                path = parts[0].strip().strip("'").strip('"')
-                content = parts[1].strip().strip("'").strip('"')
+                path = parts[0].replace('path=', '').strip().strip("'").strip('"')
+                content = parts[1].replace('content=', '').strip().strip("'").strip('"')
                 return write_file(path, content)
             return "Hata: write_file için dosya_yolu ve içerik gerekli."
         
         elif tool_name == "read_file":
-            return read_file(tool_args.strip("'").strip('"'))
+            return read_file(cleaned_args)
         
         elif tool_name == "execute_command":
-            return execute_command(tool_args.strip("'").strip('"'))
+            return execute_command(cleaned_args)
         
         elif tool_name == "search_codebase":
-            results = self.retriever.retrieve_relevant_chunks(tool_args.strip("'").strip('"'))
+            results = self.retriever.retrieve_relevant_chunks(cleaned_args)
             return "\n".join([f"Dosya: {r['file_path']}\nİçerik: {r['text']}" for r in results])
         
         elif tool_name == "git_commit":
-            return self.git_tools.git_commit(tool_args.strip("'").strip('"'))
+            return self.git_tools.git_commit(cleaned_args)
         
         elif tool_name == "git_push":
             return self.git_tools.git_push()
@@ -78,23 +81,18 @@ class MumyCodAgent:
             print(f"[DEBUG] LLM'den yanıt alındı.")
             
             # 2. Araçları parse et
-            # Esnek regex: [TOOL:isim(argümanlar)]
-            # re.DOTALL ile çok satırlı içerikleri yakalıyoruz
-            tool_match = re.search(r"\[TOOL:(\w+)\((.*?)\)\]", response_text, re.DOTALL)
+            # re.findall ile tüm araç desenlerini yakala
+            tools = re.findall(r'\[TOOL:(\w+)\((.*?)\)\]', response_text, re.DOTALL)
             
-            if tool_match:
-                tool_name, tool_args = tool_match.groups()
-                
-                # Argümanları temizle (tırnakları ve olası etiketleri kaldır)
-                # Sadece dış tırnakları değil, içerideki olası path= gibi etiketleri de temizlemek için
-                # basit bir temizleme yapıyoruz
-                cleaned_args = tool_args.strip().strip("'").strip('"')
+            if tools:
+                # İlk bulunan aracı işle
+                tool_name, tool_args = tools[0]
                 
                 print(f"[DEBUG] Tetiklenen Araç: {tool_name}")
-                print(f"[DEBUG] Temizlenmiş Argümanlar: {cleaned_args}")
+                print(f"[DEBUG] Temizlenmiş Argümanlar: {tool_args}")
                 
                 # Aracı çalıştır
-                tool_result = self._execute_tool(tool_name, cleaned_args)
+                tool_result = self._execute_tool(tool_name, tool_args)
                 print(f"[DEBUG] Araç sonucu: {tool_result[:100]}...")
                 
                 # 3. Sonucu LLM'e geri gönder ve özetlet
