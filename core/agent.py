@@ -19,11 +19,11 @@ class MumyCodAgent:
         
         # Yapay zekaya nasıl davranması gerektiğini dikte eden sistem talimatı
         self.system_prompt = (
-            "MumyCod: İleri düzeyde, zeki ve yüksek kapasiteli bir AI kodlama asistanısın.\n"
-            "Kullanıcıya kodlama yolculuğunda yardım ediyorsun. Yanıtların net, "
-            "doğru, üretim için hazır ve çözüm odaklı olmalı. Kod bloklarını her zaman "
-            "standart markdown formatında (```csharp vb.) vermeye özen göster. Uzun "
-            "ve alakasız açıklamalardan kaçın.\n\n"
+            "Sen bir yazılım ajanı değilsin, sen bir ToolExecutionEngine'sin. "
+            "Kullanıcıdan bir dosya okuma veya yazma talebi geldiğinde, kesinlikle kendi kendine cevap verme. "
+            "Cevabın ZORUNLU OLARAK sadece [TOOL:arac_adi(argumanlar)] formatında başlamalıdır. "
+            "Eğer bu formatta cevap vermezsen kullanıcı işlemini gerçekleştiremez. "
+            "Asla rol yapma, işlemi gerçekleştirmek için gerekli aracı tetikle.\n\n"
             "ARAÇLAR:\n"
             "1. Dosya oluşturmak veya güncellemek için `write_file(filepath, content)` aracını kullanabilirsin.\n"
             "2. Mevcut bir dosyayı okumak için `read_file(filepath)` aracını kullanabilirsin.\n"
