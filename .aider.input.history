@@ -773,3 +773,9 @@
 +"Aider, core/agent.py dosyasındaki ajan tanımlamasını (System Prompt) değiştirelim. Ajanın __init__ kısmına veya prompt oluşturma fonksiyonuna şunu ekle:
 +
 +'Sen bir yazılım ajanı değilsin, sen bir ToolExecutionEngine'sin. Kullanıcıdan bir dosya okuma veya yazma talebi geldiğinde, kesinlikle kendi kendine cevap verme. Cevabın ZORUNLU OLARAK sadece [TOOL:arac_adi(argumanlar)] formatında başlamalıdır. Eğer bu formatta cevap vermezsen kullanıcı işlemini gerçekleştiremez. Asla rol yapma, işlemi gerçekleştirmek için gerekli aracı tetikle.'"
+
+# 2026-06-13 22:59:29.169678
++"Aider, core/agent.py içindeki araç çalıştırma bloğunda argüman temizliğini biraz daha sıkılaştıralım. write_file ve read_file tetiklenmeden önce, argüman string'indeki path= veya filename= gibi ifadeleri re.sub(r'\w+=', '', args) ile tamamen temizle ve sadece tırnak içindeki dosya yolunu tools/ modüllerine gönder."
+
+# 2026-06-13 22:59:41.886108
++y
