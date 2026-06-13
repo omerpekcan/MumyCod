@@ -2,6 +2,11 @@ import os
 from typing import List, Dict, Any
 from llm.deepseek_provider import DeepSeekProvider
 from core.session_manager import SessionManager
+from core.planner import Planner
+from indexing.symbol_index import SymbolIndexer
+from retrieval.retriever import CodeRetriever
+from tools.file_reader import FileReader
+
 
 class MumyCodAgent:
     """
@@ -12,10 +17,11 @@ class MumyCodAgent:
     def __init__(self, model_name: str = "llama-3.3-70b-versatile"):
         # Yapay zekaya nasıl davranması gerektiğini dikte eden sistem talimatı
         self.system_prompt = (
-            "Sen MumyCod adında, terminal tabanlı çalışan otonom bir yazılım ajanısın.\n"
+            "MumyCod: İleri düzeyde, zeki ve yüksek kapasiteli bir AI kodlama asistanısın.\n"
             "Kullanıcıya kodlama yolculuğunda yardım ediyorsun. Yanıtların net, "
-            "doğru ve çözüm odaklı olmalı. Kod bloklarını her zaman standart markdown "
-            "formatında (```csharp vb.) vermeye özen göster."
+            "doğru, üretim için hazır ve çözüm odaklı olmalı. Kod bloklarını her zaman "
+            "standart markdown formatında (```csharp vb.) vermeye özen göster. Uzun "
+            "ve alakasız açıklamalardan kaçın."
         )
         
         # Hafıza şefini başlatıyoruz
@@ -23,6 +29,28 @@ class MumyCodAgent:
         
         # Varsayılan olarak Groq üzerindeki Llama/DeepSeek sağlayıcımızı bağlıyoruz
         self.provider = DeepSeekProvider(model_name=model_name)
+        
+        # Planlayıcı
+        self.planner = Planner()
+        
+        # Sembol indeksi oluştur
+        self.symbol_index = SymbolIndexer().build_symbol_index(".")
+        
+        # Kod retrieveri
+        self.retriever = CodeRetriever(
+            self.symbol_index
+        )
+        
+        # Dosya okuyucu
+        self.file_reader = FileReader()
+        
+        # Sohbet geçmişi
+        self.history = [
+            {
+                "role": "system",
+                "content": self.system_prompt
+            }
+        ]
 
     def ask(self, user_input: str) -> str:
         """
@@ -32,18 +60,56 @@ class MumyCodAgent:
         if not user_input.strip():
             return "Kanka boş mesaj gönderdin, ne yapacağımı bilemedim. 🤔"
             
-        # 1. Kullanıcının mesajını anlık hafızaya kaydet
-        self.session.add_user_message(user_input)
+        # 1. Kullanıcının mesajını sohbet geçmişine kaydet
+        self.history.append(
+            {
+                "role": "user",
+                "content": user_input
+            }
+        )
         
-        # 2. Sistem promptu dahil tüm geçmişi paketle
-        full_history = self.session.get_messages()
+        # Plan oluştur
+        plan = self.planner.plan(user_input)
         
-        # 3. Sağlayıcı üzerinden yapay zekaya ateşle
-        # İleride context_manager yazdığımızda bu geçmişi kırpıp göndereceğiz kanka!
-        response = self.provider.generate_response(full_history)
+        context_text = ""
         
-        # 4. Yapay zekanın verdiği cevabı da hafızaya kaydet (Süreklilik için çok kritik)
-        self.session.add_agent_message(response)
+        if plan["intent"] == "modify_code":
+            results = self.retriever.retrieve(user_input)
+            
+            if results:
+                target_file = results[0]
+                
+                file_content = self.file_reader.read(
+                    target_file
+                )
+                
+                context_text = f"""
+İLGİLİ DOSYA:
+{target_file}
+
+DOSYA İÇERİĞİ:
+
+{file_content[:4000]}
+"""
+        
+        if context_text:
+            self.history.append(
+                {
+                    "role": "system",
+                    "content": context_text
+                }
+            )
+        
+        # 2. Sağlayıcı üzerinden yapay zekaya ateşle
+        response = self.provider.chat(self.history)
+        
+        # 3. Yapay zekanın verdiği cevabı da sohbet geçmişine kaydet
+        self.history.append(
+            {
+                "role": "assistant",
+                "content": response
+            }
+        )
         
         return response
 
