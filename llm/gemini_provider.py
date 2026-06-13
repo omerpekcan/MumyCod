@@ -16,7 +16,8 @@ class GeminiProvider(BaseProvider):
             
         # Yeni google.genai SDK kullanımı
         self.client = genai.Client(api_key=api_key)
-        self.model_name = "gemini-2.0-flash"
+        # Model adını gemini/ ön eki ile güncelledik
+        self.model_name = "gemini/gemini-3.1-flash-lite"
         
         # Model konfigürasyonu (tools aktif)
         self.config = {
