@@ -2,12 +2,17 @@ import os
 
 def write_to_file(filepath: str, content: str) -> str:
     """
-    Belirtilen dosya yoluna içeriği yazar. Dosya yoksa oluşturur, varsa üzerine yazar.
+    Belirtilen dosya yoluna içeriği yazar. 
+    Dizin yoksa oluşturur, varsa üzerine yazar.
     """
     try:
-        # Klasör yapısı yoksa oluştur
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        # Dosya yolunun dizin kısmını al
+        directory = os.path.dirname(filepath)
         
+        # Eğer dizin belirtilmişse ve mevcut değilse oluştur
+        if directory and not os.path.exists(directory):
+            os.makedirs(directory, exist_ok=True)
+            
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(content)
         return f"Başarıyla yazıldı: {filepath}"

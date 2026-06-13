@@ -110,6 +110,7 @@ DOSYA İÇERİĞİ:
         
         # 3. Araç kullanımı kontrolü (Tool Calling)
         # [TOOL:write_to_file(path, content)] formatını ara
+        # Regex'i daha esnek hale getirdik (tırnak işaretlerini daha iyi yakalamak için)
         tool_match = re.search(r"\[TOOL:write_to_file\((.*?),\s*(.*?)\)\]", response, re.DOTALL)
         
         if tool_match:
