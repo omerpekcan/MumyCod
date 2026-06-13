@@ -10,6 +10,7 @@ from retrieval.retriever import CodeRetriever
 class MumyCodAgent:
     def __init__(self):
         print("[DEBUG] MumyCodAgent başlatılıyor...")
+        # ProviderManager ile çoklu sağlayıcı desteği aktif
         self.provider_manager = ProviderManager()
         # brain.json dosyasının doğru yolda olduğundan emin oluyoruz
         self.retriever = CodeRetriever(brain_path="memory/brain.json")
@@ -40,8 +41,8 @@ class MumyCodAgent:
         print(f"[DEBUG] Soru: {user_query}")
         
         try:
-            # 1. LLM'e sor
-            print("[DEBUG] LLM'e istek gönderiliyor (provider.chat)...")
+            # 1. LLM'e sor (ProviderManager üzerinden)
+            print("[DEBUG] LLM'e istek gönderiliyor (provider_manager.ask)...")
             response = self.provider_manager.ask(user_query)
             
             # Nesne kontrolü
