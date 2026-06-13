@@ -40,8 +40,12 @@ class MumyCodAgent:
         """Araçları çalıştıran yardımcı metod."""
         print(f"[DEBUG] Araç çalıştırılıyor: {tool_name}, Argümanlar: {tool_args}")
         
+        # Argümanları temizle (tırnakları kaldır)
+        # Not: write_file için argümanları burada değil, çağrıldığı yerde ayıracağız
+        
         if tool_name == "write_file":
-            # write_file için argümanları virgülle ayır
+            # write_file için argümanları virgülle ayır (ilk virgül dosya yolu, sonrası içerik)
+            # İçerikte virgül olabilir, bu yüzden split(..., 1) kullanıyoruz
             parts = tool_args.split(',', 1)
             if len(parts) == 2:
                 path = parts[0].strip().strip("'").strip('"')
@@ -78,22 +82,13 @@ class MumyCodAgent:
             print(f"[DEBUG] LLM'den yanıt alındı.")
             
             # 2. Araçları parse et
-            # write_file için özel regex (iki argümanlı, çok satırlı içerik destekli)
-            write_match = re.search(r"\[TOOL:write_file\((.*?),\s*(.*?)\)\]", response_text, re.DOTALL)
+            # Regex: [TOOL:isim(argümanlar)]
+            # re.DOTALL ile çok satırlı içerikleri yakalıyoruz
+            # Esnek regex: tırnakları ve boşlukları önemsemeden yakalar
+            tool_match = re.search(r"\[TOOL:(\w+)\((.*?)\)\]", response_text, re.DOTALL)
             
-            tool_name = None
-            tool_args = None
-            
-            if write_match:
-                tool_name = "write_file"
-                tool_args = f"{write_match.group(1)}, {write_match.group(2)}"
-            else:
-                # Diğer araçlar için regex
-                tool_match = re.search(r"\[TOOL:(\w+)\((.*?)\)\]", response_text, re.DOTALL)
-                if tool_match:
-                    tool_name, tool_args = tool_match.groups()
-            
-            if tool_name:
+            if tool_match:
+                tool_name, tool_args = tool_match.groups()
                 print(f"[DEBUG] Araç tespit edildi: {tool_name}")
                 
                 # Aracı çalıştır
