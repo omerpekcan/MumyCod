@@ -1,22 +1,17 @@
 import os
-import json
+from dotenv import load_dotenv
 from google import genai
 from llm.base_provider import BaseProvider
 
 class GeminiProvider(BaseProvider):
     def __init__(self):
-        # API anahtarını config/settings.json dosyasından oku
-        api_key = None
-        try:
-            with open("config/settings.json", "r") as f:
-                config = json.load(f)
-                api_key = config.get("GEMINI_API_KEY")
-        except Exception as e:
-            print(f"[DEBUG] Config okunamadı, ortam değişkenlerinden deneniyor: {e}")
-            api_key = os.getenv("GEMINI_API_KEY")
+        load_dotenv()
+        
+        # API anahtarını ortam değişkenlerinden al
+        api_key = os.environ.get("GEMINI_API_KEY")
         
         if not api_key:
-            raise ValueError("GEMINI_API_KEY bulunamadı. Lütfen config/settings.json dosyasını kontrol edin.")
+            print("API anahtarı .env dosyasından okunamadı!")
             
         # Yeni google.genai SDK kullanımı
         self.client = genai.Client(api_key=api_key)
