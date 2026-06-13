@@ -4,6 +4,7 @@ import traceback
 from llm.gemini_provider import GeminiProvider
 from tools.file_tools import read_file, write_to_file
 from tools.terminal_tools import execute_command
+from tools.git_tools import GitTools
 from retrieval.retriever import CodeRetriever
 
 class MumyCodAgent:
@@ -12,6 +13,7 @@ class MumyCodAgent:
         self.provider = GeminiProvider()
         # brain.json dosyasının doğru yolda olduğundan emin oluyoruz
         self.retriever = CodeRetriever(brain_path="memory/brain.json")
+        self.git_tools = GitTools()
         self.history = []
         print("[DEBUG] MumyCodAgent başarıyla başlatıldı.")
 
@@ -48,6 +50,12 @@ class MumyCodAgent:
                     print(f"[DEBUG] search_codebase aracı çalıştırılıyor...")
                     results = self.retriever.retrieve_relevant_chunks(tool_args)
                     res = "\n".join([f"Dosya: {r['file_path']}\nİçerik: {r['text']}" for r in results])
+                elif tool_name == "git_commit":
+                    print(f"[DEBUG] git_commit aracı çalıştırılıyor...")
+                    res = self.git_tools.git_commit(tool_args)
+                elif tool_name == "git_push":
+                    print(f"[DEBUG] git_push aracı çalıştırılıyor...")
+                    res = self.git_tools.git_push()
                 else:
                     res = f"Bilinmeyen araç: {tool_name}"
                     print(f"[DEBUG] {res}")
