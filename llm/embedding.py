@@ -8,9 +8,10 @@ def get_embedding(text: str) -> list[float]:
     api_key = os.getenv("GEMINI_API_KEY")
     client = genai.Client(api_key=api_key)
     
+    # contents parametresini liste olarak gönderiyoruz
     response = client.models.embed_content(
         model="text-embedding-004",
-        contents=text
+        contents=[text]
     )
     
     # Embedding değerlerini döndür
