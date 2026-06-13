@@ -1,0 +1,30 @@
+import os
+from groq import Groq
+from llm.base_provider import BaseProvider
+from typing import List, Dict, Any
+
+class DeepSeekProvider(BaseProvider):
+    """Groq API üzerinden Llama ve DeepSeek modellerini uçuran sınıf."""
+    
+    def __init__(self, api_key: str = None, model_name: str = "llama-3.3-70b-specdec"):
+        # Eğer parametre olarak anahtar gelmezse otomatik .env dosyasından okusun
+        actual_key = api_key or os.getenv("GROQ_API_KEY")
+        if not actual_key:
+            raise ValueError("Kanka .env dosyası içinde GROQ_API_KEY bulamadım! Kontrol et.")
+            
+        super().__init__(api_key=actual_key, model_name=model_name)
+        self.client = Groq(api_key=self.api_key)
+
+    def generate_response(self, messages: List[Dict[str, str]], **kwargs) -> str:
+        try:
+            temperature = kwargs.get("temperature", 0.2)
+            
+            completion = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=kwargs.get("max_tokens", 4096)
+            )
+            return completion.choices[0].message.content
+        except Exception as e:
+            return f"🚨 [MumyCod LLM Hatası]: Groq API ile konuşurken bir şeyler patladı: {str(e)}"
