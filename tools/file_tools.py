@@ -9,7 +9,7 @@ def read_file(filepath: str) -> str:
     except Exception as e:
         return f"Dosya okunurken hata oluştu: {str(e)}"
 
-def write_to_file(filepath: str, content: str) -> str:
+def write_file(filepath: str, content: str) -> str:
     try:
         dir_name = os.path.dirname(filepath)
         if dir_name and not os.path.exists(dir_name):

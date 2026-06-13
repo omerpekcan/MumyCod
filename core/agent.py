@@ -2,7 +2,7 @@ import re
 import os
 import traceback
 from llm.gemini_provider import GeminiProvider
-from tools.file_tools import read_file, write_to_file
+from tools.file_tools import read_file, write_file
 from tools.terminal_tools import execute_command
 from tools.git_tools import GitTools
 from retrieval.retriever import CodeRetriever
@@ -24,14 +24,14 @@ class MumyCodAgent:
             "standart markdown formatında (```csharp vb.) vermeye özen göster. Uzun "
             "ve alakasız açıklamalardan kaçın.\n\n"
             "ARAÇLAR:\n"
-            "1. Dosya oluşturmak veya güncellemek için `write_to_file(filepath, content)` aracını kullanabilirsin.\n"
+            "1. Dosya oluşturmak veya güncellemek için `write_file(filepath, content)` aracını kullanabilirsin.\n"
             "2. Mevcut bir dosyayı okumak için `read_file(filepath)` aracını kullanabilirsin.\n"
             "3. Terminal komutu çalıştırmak için `execute_command(command)` aracını kullanabilirsin.\n"
             "4. Kod tabanında arama yapmak için `search_codebase(query)` aracını kullanabilirsin.\n"
             "5. Git commit yapmak için `git_commit(message)` aracını kullanabilirsin.\n"
             "6. Git push yapmak için `git_push()` aracını kullanabilirsin.\n"
             "Bunu kullanmak için yanıtında şu formatı kullan:\n"
-            "[TOOL:write_to_file(dosya_yolu, içerik)] veya [TOOL:read_file(dosya_yolu)] veya [TOOL:execute_command(komut)] veya [TOOL:search_codebase(sorgu)] veya [TOOL:git_commit(mesaj)] veya [TOOL:git_push()]"
+            "[TOOL:write_file(dosya_yolu, içerik)] veya [TOOL:read_file(dosya_yolu)] veya [TOOL:execute_command(komut)] veya [TOOL:search_codebase(sorgu)] veya [TOOL:git_commit(mesaj)] veya [TOOL:git_push()]"
         )
         print("[DEBUG] MumyCodAgent başarıyla başlatıldı.")
 
@@ -49,6 +49,17 @@ class MumyCodAgent:
             print(f"[DEBUG] LLM'den yanıt alındı. Yanıt uzunluğu: {len(text)} karakter.")
             
             # 2. Araçları parse et (Daha esnek regex)
+            # write_file için özel regex (iki argümanlı)
+            write_match = re.search(r"\[TOOL:write_file\((.*?),\s*(.*?)\)\]", text, re.DOTALL)
+            if write_match:
+                path, content = write_match.groups()
+                path = path.strip("'").strip('"')
+                content = content.strip("'").strip('"')
+                print(f"[DEBUG] Araç tespit edildi: write_file, Dosya: {path}")
+                res = write_file(path, content)
+                return res
+
+            # Diğer araçlar için regex
             tool_match = re.search(r"\[TOOL:(\w+)\((.*?)\)\]", text)
             if tool_match:
                 tool_name, tool_args = tool_match.groups()
