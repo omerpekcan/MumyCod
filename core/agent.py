@@ -1,7 +1,7 @@
 import os
 import re
 from typing import List, Dict, Any
-from llm.deepseek_provider import DeepSeekProvider
+from llm.gemini_provider import GeminiProvider
 from core.session_manager import SessionManager
 from core.planner import Planner
 from indexing.symbol_index import SymbolIndexer
@@ -16,7 +16,7 @@ class MumyCodAgent:
     Hafızayı ve LLM sağlayıcısını koordine eder.
     """
     
-    def __init__(self, model_name: str = "llama-3.3-70b-versatile"):
+    def __init__(self, model_name: str = "gemini-1.5-flash-lite"):
         # Yapay zekaya nasıl davranması gerektiğini dikte eden sistem talimatı
         self.system_prompt = (
             "MumyCod: İleri düzeyde, zeki ve yüksek kapasiteli bir AI kodlama asistanısın.\n"
@@ -34,8 +34,9 @@ class MumyCodAgent:
         # Hafıza şefini başlatıyoruz
         self.session = SessionManager(system_prompt=self.system_prompt)
         
-        # Varsayılan olarak Groq üzerindeki Llama/DeepSeek sağlayıcımızı bağlıyoruz
-        self.provider = DeepSeekProvider(model_name=model_name)
+        # Gemini sağlayıcısını başlatıyoruz (API anahtarını ortam değişkeninden alıyoruz)
+        api_key = os.getenv("GEMINI_API_KEY")
+        self.provider = GeminiProvider(api_key=api_key, model_name=model_name)
         
         # Planlayıcı
         self.planner = Planner()
