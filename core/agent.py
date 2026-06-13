@@ -49,43 +49,53 @@ class MumyCodAgent:
             print(f"[DEBUG] LLM'den yanıt alındı. Yanıt uzunluğu: {len(text)} karakter.")
             
             # 2. Araçları parse et
+            # Daha esnek regex: [TOOL:isim(argümanlar)]
+            # re.DOTALL ile çok satırlı içerikleri yakalıyoruz
+            tool_match = re.search(r"\[TOOL:(\w+)\((.*?)\)\]", text, re.DOTALL)
             
-            # write_file için özel regex (iki argümanlı, çok satırlı içerik destekli)
-            write_match = re.search(r"\[TOOL:write_file\((.*?),\s*(.*?)\)\]", text, re.DOTALL)
-            if write_match:
-                path, content = write_match.groups()
-                path = path.strip("'").strip('"')
-                content = content.strip("'").strip('"')
-                print(f"[DEBUG] Araç tespit edildi: write_file, Dosya: {path}")
-                res = write_file(path, content)
-                return res
-
-            # Diğer araçlar için regex
-            tool_match = re.search(r"\[TOOL:(\w+)\((.*?)\)\]", text)
             if tool_match:
                 tool_name, tool_args = tool_match.groups()
-                # Argümanlardaki tırnakları temizle
-                tool_args = tool_args.strip("'").strip('"')
-                
-                print(f"[DEBUG] Araç tespit edildi: {tool_name}, Argümanlar: {tool_args}")
+                print(f"[DEBUG] Araç tespit edildi: {tool_name}")
                 
                 # Araçları işle
-                if tool_name == "read_file":
-                    print(f"[DEBUG] read_file aracı çalıştırılıyor...")
-                    res = read_file(tool_args)
+                if tool_name == "write_file":
+                    # write_file için argümanları virgülle ayır (ilk virgül dosya yolu, sonrası içerik)
+                    # İçerikte virgül olabilir, bu yüzden split(..., 1) kullanıyoruz
+                    parts = tool_args.split(',', 1)
+                    if len(parts) == 2:
+                        path = parts[0].strip().strip("'").strip('"')
+                        content = parts[1].strip().strip("'").strip('"')
+                        print(f"[DEBUG] write_file çalıştırılıyor, Dosya: {path}")
+                        res = write_file(path, content)
+                        return res
+                    else:
+                        res = "Hata: write_file için dosya_yolu ve içerik gerekli."
+                
+                elif tool_name == "read_file":
+                    path = tool_args.strip("'").strip('"')
+                    print(f"[DEBUG] read_file çalıştırılıyor, Dosya: {path}")
+                    res = read_file(path)
+                
                 elif tool_name == "execute_command":
-                    print(f"[DEBUG] execute_command aracı çalıştırılıyor...")
-                    res = execute_command(tool_args)
+                    cmd = tool_args.strip("'").strip('"')
+                    print(f"[DEBUG] execute_command çalıştırılıyor, Komut: {cmd}")
+                    res = execute_command(cmd)
+                
                 elif tool_name == "search_codebase":
-                    print(f"[DEBUG] search_codebase aracı çalıştırılıyor...")
-                    results = self.retriever.retrieve_relevant_chunks(tool_args)
+                    query = tool_args.strip("'").strip('"')
+                    print(f"[DEBUG] search_codebase çalıştırılıyor, Sorgu: {query}")
+                    results = self.retriever.retrieve_relevant_chunks(query)
                     res = "\n".join([f"Dosya: {r['file_path']}\nİçerik: {r['text']}" for r in results])
+                
                 elif tool_name == "git_commit":
-                    print(f"[DEBUG] git_commit aracı çalıştırılıyor...")
-                    res = self.git_tools.git_commit(tool_args)
+                    msg = tool_args.strip("'").strip('"')
+                    print(f"[DEBUG] git_commit çalıştırılıyor, Mesaj: {msg}")
+                    res = self.git_tools.git_commit(msg)
+                
                 elif tool_name == "git_push":
-                    print(f"[DEBUG] git_push aracı çalıştırılıyor...")
+                    print(f"[DEBUG] git_push çalıştırılıyor...")
                     res = self.git_tools.git_push()
+                
                 else:
                     res = f"Bilinmeyen araç: {tool_name}"
                     print(f"[DEBUG] {res}")
