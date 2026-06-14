@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Optional
+from typing import Optional, Dict
 from dotenv import load_dotenv
 from google import genai
 from groq import Groq
@@ -12,6 +12,11 @@ class ProviderManager:
         print("[DEBUG] .env dosyası yükleniyor...")
         
         self.blacklist = set()
+        self.failure_counts: Dict[str, int] = {}
+        self.circuit_breakers: Dict[str, float] = {}
+        self.MAX_FAILURES = 3
+        self.RECOVERY_TIME = 300  # 5 dakika
+
         self.providers = [
             {"name": "gemini", "api_key": os.environ.get("GEMINI_API_KEY")},
             {"name": "groq", "api_key": os.environ.get("GROQ_API_KEY")},
@@ -92,17 +97,27 @@ class ProviderManager:
     def ask(self, prompt: str) -> str:
         """
         Sağlayıcılar arasında döngü kurar ve hata durumunda bir sonrakine geçer.
-        Detaylı hata raporlaması yaparak feedback sağlar.
+        Circuit Breaker mantığı ile hatalı sağlayıcıları izole eder.
         """
         print("[DEBUG] Prompt işlenmek üzere sağlayıcılara gönderiliyor...")
-        print(f"[DEBUG] Prompt uzunluğu: {len(prompt)} karakter")
         
         last_error = None
         attempted_providers = []
+        current_time = time.time()
         
         for provider in self.providers:
-            if provider["name"] in self.blacklist:
-                print(f"[DEBUG] {provider['name']} blacklist'te, atlaniyor.")
+            p_name = provider["name"]
+
+            # Circuit Breaker Kontrolü
+            if p_name in self.circuit_breakers:
+                if current_time < self.circuit_breakers[p_name]:
+                    print(f"[DEBUG] {p_name} devre dışı (Circuit Open), atlanıyor.")
+                    continue
+                else:
+                    print(f"[DEBUG] {p_name} deneme aşamasında (Circuit Half-Open)...")
+
+            if p_name in self.blacklist:
+                print(f"[DEBUG] {p_name} blacklist'te, atlaniyor.")
                 continue
             
             if not provider["api_key"]:
@@ -123,7 +138,9 @@ class ProviderManager:
                         contents=prompt
                     )
                     response_text = response.text or ""
-                    print(f"[DEBUG] Gemini başarıyla yanıt verdi (Yanıt uzunluğu: {len(response_text)} karakter)")
+                    self.failure_counts[p_name] = 0  # Başarı durumunda sıfırla
+                    if p_name in self.circuit_breakers: del self.circuit_breakers[p_name]
+                    print(f"[DEBUG] Gemini başarıyla yanıt verdi")
                     return response_text
                     
                 elif provider["name"] == "groq":
@@ -136,7 +153,9 @@ class ProviderManager:
                         timeout=30.0
                     )
                     response_content = chat_completion.choices[0].message.content or ""
-                    print(f"[DEBUG] Groq başarıyla yanıt verdi (Yanıt uzunluğu: {len(response_content)} karakter)")
+                    self.failure_counts[p_name] = 0
+                    if p_name in self.circuit_breakers: del self.circuit_breakers[p_name]
+                    print(f"[DEBUG] Groq başarıyla yanıt verdi")
                     return response_content
                     
                 elif provider["name"] == "openrouter":
@@ -148,21 +167,22 @@ class ProviderManager:
                         messages=[{"role": "user", "content": prompt}]
                     )
                     response_content = completion.choices[0].message.content or ""
-                    print(f"[DEBUG] OpenRouter başarıyla yanıt verdi (Yanıt uzunluğu: {len(response_content)} karakter)")
+                    self.failure_counts[p_name] = 0
+                    if p_name in self.circuit_breakers: del self.circuit_breakers[p_name]
+                    print(f"[DEBUG] OpenRouter başarıyla yanıt verdi")
                     return response_content
             
             except Exception as e:
                 last_error = e
-                print(f"[DEBUG] {provider['name']} hata fırlattı: {type(e).__name__}")
-                action = self._handle_error(e, provider["name"])
+                self.failure_counts[p_name] = self.failure_counts.get(p_name, 0) + 1
                 
-                if action == "BLACKLIST":
-                    print(f"[DEBUG] {provider['name']} blacklist'e eklendi, diğer sağlayıcılar deneniyor...")
-                elif action == "NEXT":
-                    print(f"[DEBUG] {provider['name']} başarısız, bir sonraki sağlayıcıya geçiliyor...")
-                else:
-                    print(f"[DEBUG] {provider['name']} başarısız (FAIL), bir sonraki sağlayıcıya geçiliyor...")
+                print(f"[DEBUG] {p_name} hata fırlattı: {type(e).__name__} (Hata Sayısı: {self.failure_counts[p_name]})")
                 
+                if self.failure_counts[p_name] >= self.MAX_FAILURES:
+                    self.circuit_breakers[p_name] = time.time() + self.RECOVERY_TIME
+                    print(f"[DEBUG] {p_name} için Circuit Breaker AÇILDI. {self.RECOVERY_TIME}s devre dışı.")
+
+                action = self._handle_error(e, p_name)
                 continue
         
         print("[DEBUG] Tüm sağlayıcılar başarısız oldu.")
