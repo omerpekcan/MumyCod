@@ -1,31 +1,41 @@
-import os
-from dotenv import load_dotenv
+import sys
 from core.agent import MumyCodAgent
 
 def main():
-    # .env dosyasındaki GROQ_API_KEY'i sisteme yüklüyoruz
-    load_dotenv()
-    
-    print("🧟‍♂️ MumyCod Arka Plan Motoru Başlatılıyor...")
+    """
+    MumyCod giriş noktası. 
+    Agent'ı başlatır ve terminal üzerinden kullanıcı etkileşimini yönetir.
+    """
     try:
-        # Ajanımızı ayağa kaldırıyoruz
         agent = MumyCodAgent()
-        print("✅ Motor başarıyla ateşlendi! Groq bağlantısı hazır.")
-        print("-" * 50)
-        
-        # İlk test sorumuzu soruyoruz
-        soru = "Selam MumyCod! Ben senin geliştiricin Mumy. Bana C#'ta hızlıca ekrana yazı yazdıran kodu verir misin?"
-        print(f"Kullanıcı: {soru}\n")
-        
-        print("🤖 MumyCod Düşünüyor ve Cevap Üretiyor...\n")
-        cevap = agent.ask(soru)
-        
-        print(f"MumyCod: {cevap}")
-        print("-" * 50)
-        print("🎉 TEST BAŞARILI! Yapay zeka canavar gibi cevap verdi kanka.")
-        
+        print("\nMumyCod: Merhaba! Ben yazılım asistanınız MumyCod. Size nasıl yardımcı olabilirim?")
+        print("(Çıkmak için 'exit' veya 'quit' yazabilirsiniz.)\n")
+
+        while True:
+            try:
+                user_input = input("Siz >> ").strip()
+                
+                if not user_input:
+                    continue
+                
+                if user_input.lower() in ["exit", "quit", "çıkış"]:
+                    print("MumyCod: Görüşmek üzere!")
+                    break
+
+                # Agent üzerinden sorguyu işle
+                response = agent.ask(user_input)
+                
+                print(f"\nMumyCod >> {response}\n")
+
+            except KeyboardInterrupt:
+                print("\n\nMumyCod: İşlem kullanıcı tarafından kesildi. Görüşmek üzere!")
+                break
+            except Exception as e:
+                print(f"\n[SİSTEM HATASI] Bir hata oluştu: {str(e)}\n")
+
     except Exception as e:
-        print(f"🚨 Test Sırasında Hata Çıktı Kanka: {str(e)}")
+        print(f"Başlatma hatası: {str(e)}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
