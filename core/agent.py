@@ -202,8 +202,11 @@ class MumyCodAgent:
             # 2. Araçları basitçe parse et
             if "[TOOL:" in response:
                 try:
-                    # [TOOL:name(args)] -> name(args)
-                    tool_call = response.split("[TOOL:")[1].split("]")[0]
+                    # Regex ile daha güvenli bir yakalama yapalım
+                    match = re.search(r"\[TOOL:(.*?)\]", response, re.DOTALL)
+                    if not match:
+                        return response
+                    tool_call = match.group(1).strip()
                     
                     # Aracı çalıştır
                     result = self._execute_tool(tool_call)

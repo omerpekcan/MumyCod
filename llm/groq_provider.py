@@ -16,18 +16,19 @@ class GroqProvider(BaseProvider):
         )
 
     def generate(self, prompt: str) -> str:
-
-        completion = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
-        )
-
-        return completion.choices[0].message.content
+        try:
+            completion = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
+            )
+            return completion.choices[0].message.content
+        except Exception as e:
+            return f"Error in Groq generate: {str(e)}"
 
     def chat(self, messages: list) -> str:
 

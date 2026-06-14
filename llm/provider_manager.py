@@ -133,6 +133,7 @@ class ProviderManager:
                     chat_completion = self.client_groq.chat.completions.create(
                         messages=[{"role": "user", "content": prompt}],
                         model="llama-3.3-70b-versatile",
+                        timeout=30.0
                     )
                     response_content = chat_completion.choices[0].message.content or ""
                     print(f"[DEBUG] Groq başarıyla yanıt verdi (Yanıt uzunluğu: {len(response_content)} karakter)")
