@@ -3,6 +3,7 @@ import time
 from typing import Optional, Dict
 from dotenv import load_dotenv
 from google import genai
+from google.api_core import exceptions
 from groq import Groq
 from openai import OpenAI
 
@@ -51,9 +52,19 @@ class ProviderManager:
         else:
             print("[DEBUG] OpenRouter istemcisi başlatılamadı (API anahtarı yok)")
 
+    def _get_status_code(self, e):
+        """Hata nesnesinden HTTP durum kodunu çıkarır."""
+        if isinstance(e, exceptions.ResourceExhausted):
+            return 429
+        if isinstance(e, (exceptions.ServiceUnavailable, exceptions.InternalServerError)):
+            return 503
+        if isinstance(e, exceptions.GoogleAPICallError):
+            return getattr(e, 'code', 0)
+        return getattr(e, 'status_code', getattr(e, 'code', 0))
+
     def _handle_error(self, e, provider_name):
         """Hata türünü analiz eder, neden ve aksiyon belirler."""
-        status_code = getattr(e, 'status_code', getattr(e, 'code', 0))
+        status_code = self._get_status_code(e)
         error_type = type(e).__name__
         error_msg = str(e).lower()
         
