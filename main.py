@@ -1,14 +1,20 @@
+import os
 import sys
+from dotenv import load_dotenv
 from core.agent import MumyCodAgent
 
 def main():
     """
     MumyCod giriş noktası. 
-    Agent'ı başlatır ve terminal üzerinden kullanıcı etkileşimini yönetir.
+    .env yükler, Agent'ı başlatır ve terminal üzerinden kullanıcı etkileşimini yönetir.
     """
+    # .env dosyasını yükle
+    load_dotenv()
+    
     try:
+        # Ajanı başlat
         agent = MumyCodAgent()
-        print("\nMumyCod: Merhaba! Ben yazılım asistanınız MumyCod. Size nasıl yardımcı olabilirim?")
+        print("\n🧟 MumyCod: Merhaba! Ben yazılım asistanınız MumyCod. Size nasıl yardımcı olabilirim?")
         print("(Çıkmak için 'exit' veya 'quit' yazabilirsiniz.)\n")
 
         while True:
@@ -19,7 +25,7 @@ def main():
                     continue
                 
                 if user_input.lower() in ["exit", "quit", "çıkış"]:
-                    print("MumyCod: Görüşmek üzere!")
+                    print("MumyCod: Görüşmek üzere! 🧟")
                     break
 
                 # Agent üzerinden sorguyu işle
