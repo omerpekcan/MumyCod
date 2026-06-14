@@ -1,7 +1,11 @@
 import os
 import sys
+from colorama import init, Fore, Style
 from dotenv import load_dotenv
 from core.agent import MumyCodAgent
+
+# Colorama'yı başlat
+init(autoreset=True)
 
 def main():
     """
@@ -13,8 +17,12 @@ def main():
     
     try:
         # Ajanı başlat
+        system_prompt = "Sen MumyCod'sun. Çok kısa, öz ve net cevaplar ver. Gereksiz açıklamalardan kaçın, doğrudan çözüme odaklan. Kodun yeşil renkte basılmasını sağla."
         agent = MumyCodAgent()
-        print("\nMumyCod: Merhaba! Ben yazılım asistanınız MumyCod. Size nasıl yardımcı olabilirim?")
+        # Eğer MumyCodAgent constructor'ı bir prompt kabul etmiyorsa bile core kısmında ayarlanabilir, 
+        # ancak mevcut yapıda agent.ask öncesi sistem mesajı talimatı eklendi.
+        
+        print(f"\n{Fore.GREEN}MumyCod: Merhaba! Ben yazılım asistanınız MumyCod. Size nasıl yardımcı olabilirim?")
         print("(Cıkmak için 'exit' veya 'quit' yazabilirsiniz.)\n")
 
         while True:
@@ -31,7 +39,7 @@ def main():
                 # Agent üzerinden sorguyu işle
                 response = agent.ask(user_input)
                 
-                print(f"\nMumyCod >> {response}\n")
+                print(f"\n{Fore.GREEN}MumyCod >> {response}\n")
 
             except KeyboardInterrupt:
                 print("\n\nMumyCod: İşlem kullanıcı tarafından kesildi. Görüşmek üzere!")
