@@ -14,8 +14,8 @@ def main():
     try:
         # Ajanı başlat
         agent = MumyCodAgent()
-        print("\n🧟 MumyCod: Merhaba! Ben yazılım asistanınız MumyCod. Size nasıl yardımcı olabilirim?")
-        print("(Çıkmak için 'exit' veya 'quit' yazabilirsiniz.)\n")
+        print("\nMumyCod: Merhaba! Ben yazılım asistanınız MumyCod. Size nasıl yardımcı olabilirim?")
+        print("(Cıkmak için 'exit' veya 'quit' yazabilirsiniz.)\n")
 
         while True:
             try:
@@ -24,8 +24,8 @@ def main():
                 if not user_input:
                     continue
                 
-                if user_input.lower() in ["exit", "quit", "çıkış"]:
-                    print("MumyCod: Görüşmek üzere! 🧟")
+                if user_input.lower() in ["exit", "quit"]:
+                    print("MumyCod: Gorusmek uzere!")
                     break
 
                 # Agent üzerinden sorguyu işle

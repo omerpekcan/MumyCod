@@ -22,9 +22,9 @@ class ProviderManager:
         print("[DEBUG] API anahtarları kontrol ediliyor:")
         for provider in self.providers:
             if provider["api_key"]:
-                print(f"  ✓ {provider['name'].upper()}: API anahtarı bulundu (ilk 10 karakter: {provider['api_key'][:10]}...)")
+                print(f"  [OK] {provider['name'].upper()}: API anahtarı bulundu (ilk 10 karakter: {provider['api_key'][:10]}...)")
             else:
-                print(f"  ✗ {provider['name'].upper()}: API anahtarı bulunamadı")
+                print(f"  [MISSING] {provider['name'].upper()}: API anahtarı bulunamadı")
         
         # İstemcileri __init__ içinde başlatıyoruz
         print("[DEBUG] İstemciler başlatılıyorum...")
