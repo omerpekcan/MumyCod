@@ -28,7 +28,7 @@ except Exception as e:
 
 print("[4/4] Sorgu testi yapılıyor...")
 try:
-    result = agent.search_codebase("terminal_tools")
+    result = agent.ask("terminal_tools")
     print(f"-> Arama sonucu: {result[:200]}")
 except Exception as e:
     print(f"-> HATA: Arama başarısız: {e}")

@@ -20,9 +20,7 @@ class GeminiProvider(BaseProvider):
         self.model_name = "gemini/gemini-3.1-flash-lite"
         
         # Model konfigürasyonu (tools aktif)
-        self.config = {
-            "tools": [] # Araçlar burada tanımlanabilir
-        }
+        self.config = None
 
     @retry(stop=stop_after_attempt(3), wait=wait_fixed(10))
     def generate(self, prompt: str) -> str:
@@ -31,17 +29,17 @@ class GeminiProvider(BaseProvider):
             contents=prompt,
             config=self.config
         )
-        return response.text
+        return response.text or ""
 
     @retry(stop=stop_after_attempt(3), wait=wait_fixed(10))
-    def chat(self, history_or_prompt) -> str:
+    def chat(self, messages) -> str:
         # Eğer gelen veri düz bir string ise direkt üret ve dön
-        if isinstance(history_or_prompt, str):
-            return self.generate(history_or_prompt)
+        if isinstance(messages, str):
+            return self.generate(messages)
             
         # Gemini formatına dönüştür
         formatted_contents = []
-        for message in history_or_prompt:
+        for message in messages:
             # 'system' veya 'user' rollerini 'user' olarak, 'assistant'ı 'model' olarak eşle
             role = "user" if message.get("role") in ["user", "system"] else "model"
             
@@ -54,7 +52,7 @@ class GeminiProvider(BaseProvider):
             contents=formatted_contents,
             config=self.config
         )
-        return response.text
+        return response.text or ""
 
     def summarize(self, text: str) -> str:
         return self.generate(f"Summarize this: {text}")

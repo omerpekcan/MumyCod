@@ -1,5 +1,6 @@
 import os
 import time
+from typing import Optional
 from dotenv import load_dotenv
 from google import genai
 from groq import Groq
@@ -26,20 +27,20 @@ class ProviderManager:
                 print(f"  ✗ {provider['name'].upper()}: API anahtarı bulunamadı")
         
         # İstemcileri __init__ içinde başlatıyoruz
-        print("[DEBUG] İstemciler başlatılıyor...")
-        self.client_gemini = genai.Client(api_key=os.environ.get("GEMINI_API_KEY")) if os.environ.get("GEMINI_API_KEY") else None
+        print("[DEBUG] İstemciler başlatılıyorum...")
+        self.client_gemini: Optional[genai.Client] = genai.Client(api_key=os.environ.get("GEMINI_API_KEY")) if os.environ.get("GEMINI_API_KEY") else None
         if self.client_gemini:
             print("[DEBUG] Gemini istemcisi başarıyla başlatıldı")
         else:
             print("[DEBUG] Gemini istemcisi başlatılamadı (API anahtarı yok)")
             
-        self.client_groq = Groq(api_key=os.environ.get("GROQ_API_KEY")) if os.environ.get("GROQ_API_KEY") else None
+        self.client_groq: Optional[Groq] = Groq(api_key=os.environ.get("GROQ_API_KEY")) if os.environ.get("GROQ_API_KEY") else None
         if self.client_groq:
             print("[DEBUG] Groq istemcisi başarıyla başlatıldı")
         else:
             print("[DEBUG] Groq istemcisi başlatılamadı (API anahtarı yok)")
             
-        self.client_openrouter = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ.get("OPENROUTER_API_KEY")) if os.environ.get("OPENROUTER_API_KEY") else None
+        self.client_openrouter: Optional[OpenAI] = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ.get("OPENROUTER_API_KEY")) if os.environ.get("OPENROUTER_API_KEY") else None
         if self.client_openrouter:
             print("[DEBUG] OpenRouter istemcisi başarıyla başlatıldı")
         else:
@@ -115,30 +116,37 @@ class ProviderManager:
                 
                 if provider["name"] == "gemini":
                     print(f"[DEBUG] Gemini API'sine istek gönderiliyor (model: gemini-3.5-flash)...")
+                    if self.client_gemini is None:
+                        raise Exception("Gemini istemcisi başlatılamadı")
                     response = self.client_gemini.models.generate_content(
                         model="models/gemini-3.5-flash",
                         contents=prompt
                     )
-                    print(f"[DEBUG] Gemini başarıyla yanıt verdi (Yanıt uzunluğu: {len(response.text)} karakter)")
-                    return response.text
+                    response_text = response.text or ""
+                    print(f"[DEBUG] Gemini başarıyla yanıt verdi (Yanıt uzunluğu: {len(response_text)} karakter)")
+                    return response_text
                     
                 elif provider["name"] == "groq":
                     print(f"[DEBUG] Groq API'sine istek gönderiliyor (model: llama-3.3-70b-versatile)...")
+                    if self.client_groq is None:
+                        raise Exception("Groq istemcisi başlatılamadı")
                     chat_completion = self.client_groq.chat.completions.create(
                         messages=[{"role": "user", "content": prompt}],
                         model="llama-3.3-70b-versatile",
                     )
-                    response_content = chat_completion.choices[0].message.content
+                    response_content = chat_completion.choices[0].message.content or ""
                     print(f"[DEBUG] Groq başarıyla yanıt verdi (Yanıt uzunluğu: {len(response_content)} karakter)")
                     return response_content
                     
                 elif provider["name"] == "openrouter":
                     print(f"[DEBUG] OpenRouter API'sine istek gönderiliyor (model: google/gemini-2.0-flash-lite-preview:free)...")
+                    if self.client_openrouter is None:
+                        raise Exception("OpenRouter istemcisi başlatılamadı")
                     completion = self.client_openrouter.chat.completions.create(
                         model="google/gemini-2.0-flash-lite-preview:free",
                         messages=[{"role": "user", "content": prompt}]
                     )
-                    response_content = completion.choices[0].message.content
+                    response_content = completion.choices[0].message.content or ""
                     print(f"[DEBUG] OpenRouter başarıyla yanıt verdi (Yanıt uzunluğu: {len(response_content)} karakter)")
                     return response_content
             

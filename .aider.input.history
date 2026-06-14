@@ -799,3 +799,10 @@
 +Eğer top_k kadar sonuç bulamazsa, loglara [DEBUG] Yeterli eşleşme bulunamadı diye yazsın.
 +
 +retrieve işlemi sonucunda dönen parçaların toplam token sayısını kabaca hesaplayan bir print ekle."
+
+# 2026-06-15 01:40:25.312891
++/add .
++"Bu proje bir MumyCod betiği. Projeyi bütünüyle incele, dosya yapısını anla ve Groq API bağlantısında veya dosya işleme mantığında gördüğün yapısal hataları listele. Önce raporla, sonra düzeltmeye başlayalım."
+
+# 2026-06-15 01:40:33.894125
++y

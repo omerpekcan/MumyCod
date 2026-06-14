@@ -51,7 +51,7 @@ class MumyCodAgent:
             if cmd:
                 return f"Komut işleniyor: {cmd}"
             return "Bilinmeyen komut"
-        return None
+        return ""
 
     def _detect_error_in_result(self, result: str) -> tuple[bool, str]:
         """Araç çıktısında hata var mı kontrol eder."""
