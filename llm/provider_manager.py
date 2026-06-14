@@ -7,9 +7,34 @@ from google.api_core import exceptions
 from groq import Groq
 from openai import OpenAI
 
+class ConfigLoader:
+    """ConfigLoader: .env dosyasındaki API anahtarlarını ve ayarları yükler."""
+    @staticmethod
+    def load_config() -> Dict:
+        load_dotenv()
+        return {
+            "primary": {
+                "name": "gemini",
+                "api_key": os.getenv("GEMINI_API_KEY"),
+                "model": "models/gemini-3.5-flash"
+            },
+            "fallbacks": [
+                {
+                    "name": "groq",
+                    "api_key": os.getenv("GROQ_API_KEY"),
+                    "model": "llama-3.3-70b-versatile"
+                },
+                {
+                    "name": "openrouter",
+                    "api_key": os.getenv("OPENROUTER_API_KEY"),
+                    "model": "google/gemini-2.0-flash-lite-preview:free"
+                }
+            ]
+        }
+
 class ProviderManager:
     def __init__(self):
-        load_dotenv()
+        self.config = ConfigLoader.load_config()
         print("[DEBUG] .env dosyası yükleniyor...")
         
         self.blacklist = set()
@@ -18,39 +43,25 @@ class ProviderManager:
         self.MAX_FAILURES = 3
         self.RECOVERY_TIME = 300  # 5 dakika
 
-        self.providers = [
-            {"name": "gemini", "api_key": os.environ.get("GEMINI_API_KEY")},
-            {"name": "groq", "api_key": os.environ.get("GROQ_API_KEY")},
-            {"name": "openrouter", "api_key": os.environ.get("OPENROUTER_API_KEY")}
-        ]
+        # Sağlayıcı listesini config üzerinden oluştur
+        self.providers = [self.config["primary"]] + self.config["fallbacks"]
         
         # API anahtarlarının varlığını kontrol et ve log bas
         print("[DEBUG] API anahtarları kontrol ediliyor:")
         for provider in self.providers:
-            if provider["api_key"]:
-                print(f"  [OK] {provider['name'].upper()}: API anahtarı bulundu (ilk 10 karakter: {provider['api_key'][:10]}...)")
-            else:
-                print(f"  [MISSING] {provider['name'].upper()}: API anahtarı bulunamadı")
+            status = "[OK]" if provider["api_key"] else "[MISSING]"
+            key_preview = f"(ilk 10 karakter: {provider['api_key'][:10]}...)" if provider["api_key"] else "bulunamadı"
+            print(f"  {status} {provider['name'].upper()}: API anahtarı {key_preview}")
         
-        # İstemcileri __init__ içinde başlatıyoruz
-        print("[DEBUG] İstemciler başlatılıyorum...")
-        self.client_gemini: Optional[genai.Client] = genai.Client(api_key=os.environ.get("GEMINI_API_KEY")) if os.environ.get("GEMINI_API_KEY") else None
-        if self.client_gemini:
-            print("[DEBUG] Gemini istemcisi başarıyla başlatıldı")
-        else:
-            print("[DEBUG] Gemini istemcisi başlatılamadı (API anahtarı yok)")
-            
-        self.client_groq: Optional[Groq] = Groq(api_key=os.environ.get("GROQ_API_KEY")) if os.environ.get("GROQ_API_KEY") else None
-        if self.client_groq:
-            print("[DEBUG] Groq istemcisi başarıyla başlatıldı")
-        else:
-            print("[DEBUG] Groq istemcisi başlatılamadı (API anahtarı yok)")
-            
-        self.client_openrouter: Optional[OpenAI] = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ.get("OPENROUTER_API_KEY")) if os.environ.get("OPENROUTER_API_KEY") else None
-        if self.client_openrouter:
-            print("[DEBUG] OpenRouter istemcisi başarıyla başlatıldı")
-        else:
-            print("[DEBUG] OpenRouter istemcisi başlatılamadı (API anahtarı yok)")
+        # İstemcileri başlat
+        print("[DEBUG] İstemciler başlatılıyor...")
+        self.client_gemini = genai.Client(api_key=self.config["primary"]["api_key"]) if self.config["primary"]["api_key"] else None
+        
+        groq_cfg = next((p for p in self.config["fallbacks"] if p["name"] == "groq"), None)
+        self.client_groq = Groq(api_key=groq_cfg["api_key"]) if groq_cfg and groq_cfg["api_key"] else None
+        
+        or_cfg = next((p for p in self.config["fallbacks"] if p["name"] == "openrouter"), None)
+        self.client_openrouter = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=or_cfg["api_key"]) if or_cfg and or_cfg["api_key"] else None
 
     def _get_status_code(self, e):
         """Hata nesnesinden HTTP durum kodunu çıkarır."""
@@ -141,11 +152,12 @@ class ProviderManager:
                 print(f"[DEBUG] {provider['name']} ile deneniyor... (Girişim: {len(attempted_providers)}/{len([p for p in self.providers if p['api_key']])})")
                 
                 if provider["name"] == "gemini":
-                    print(f"[DEBUG] Gemini API'sine istek gönderiliyor (model: gemini-3.5-flash)...")
+                    model_name = provider.get("model", "models/gemini-3.5-flash")
+                    print(f"[DEBUG] Gemini API'sine istek gönderiliyor (model: {model_name})...")
                     if self.client_gemini is None:
                         raise Exception("Gemini istemcisi başlatılamadı")
                     response = self.client_gemini.models.generate_content(
-                        model="models/gemini-3.5-flash",
+                        model=model_name,
                         contents=prompt
                     )
                     response_text = response.text or ""
@@ -155,12 +167,13 @@ class ProviderManager:
                     return response_text
                     
                 elif provider["name"] == "groq":
-                    print(f"[DEBUG] Groq API'sine istek gönderiliyor (model: llama-3.3-70b-versatile)...")
+                    model_name = provider.get("model", "llama-3.3-70b-versatile")
+                    print(f"[DEBUG] Groq API'sine istek gönderiliyor (model: {model_name})...")
                     if self.client_groq is None:
                         raise Exception("Groq istemcisi başlatılamadı")
                     chat_completion = self.client_groq.chat.completions.create(
                         messages=[{"role": "user", "content": prompt}],
-                        model="llama-3.3-70b-versatile",
+                        model=model_name,
                         timeout=30.0
                     )
                     response_content = chat_completion.choices[0].message.content or ""
@@ -170,11 +183,12 @@ class ProviderManager:
                     return response_content
                     
                 elif provider["name"] == "openrouter":
-                    print(f"[DEBUG] OpenRouter API'sine istek gönderiliyor (model: google/gemini-2.0-flash-lite-preview:free)...")
+                    model_name = provider.get("model", "google/gemini-2.0-flash-lite-preview:free")
+                    print(f"[DEBUG] OpenRouter API'sine istek gönderiliyor (model: {model_name})...")
                     if self.client_openrouter is None:
                         raise Exception("OpenRouter istemcisi başlatılamadı")
                     completion = self.client_openrouter.chat.completions.create(
-                        model="google/gemini-2.0-flash-lite-preview:free",
+                        model=model_name,
                         messages=[{"role": "user", "content": prompt}]
                     )
                     response_content = completion.choices[0].message.content or ""
