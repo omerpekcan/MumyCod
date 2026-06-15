@@ -3,6 +3,7 @@ import time
 from typing import Optional, Dict
 from dotenv import load_dotenv
 from google import genai
+from google.genai import types
 from google.api_core import exceptions
 from groq import Groq
 from openai import OpenAI
@@ -16,7 +17,7 @@ class ConfigLoader:
             "primary": {
                 "name": "gemini",
                 "api_key": os.getenv("GEMINI_API_KEY"),
-                "model": "models/gemini-3.5-flash"
+                "model": "models/gemini-2.5-flash-lite"
             },
             "fallbacks": [
                 {
@@ -122,6 +123,9 @@ class ProviderManager:
         Circuit Breaker mantığı ile hatalı sağlayıcıları izole eder.
         """
         print("[DEBUG] Prompt işlenmek üzere sağlayıcılara gönderiliyor...")
+        print(f"[DEBUG] SYSTEM PROMPT UZUNLUĞU: {len(system_prompt)} karakter")
+        print(f"[DEBUG] SYSTEM PROMPT İLK 100 KARAKTER: {system_prompt[:100]}")
+
         
         last_error = None
         attempted_providers = []
@@ -152,14 +156,15 @@ class ProviderManager:
                 print(f"[DEBUG] {provider['name']} ile deneniyor... (Girişim: {len(attempted_providers)}/{len([p for p in self.providers if p['api_key']])})")
                 
                 if provider["name"] == "gemini":
-                    model_name = provider.get("model", "models/gemini-3.5-flash")
+                    model_name = provider.get("model", "models/gemini-2.5-flash-lite")
                     print(f"[DEBUG] Gemini API'sine istek gönderiliyor (model: {model_name})...")
                     if self.client_gemini is None:
                         raise Exception("Gemini istemcisi başlatılamadı")
                     response = self.client_gemini.models.generate_content(
                         model=model_name,
                         contents=prompt,
-                        system_instruction=system_prompt
+                        system_instruction=system_prompt,
+                        config=types.GenerateContentConfig(max_output_tokens=8192)
                     )
                     response_text = response.text or ""
                     self.failure_counts[p_name] = 0  # Başarı durumunda sıfırla
@@ -175,6 +180,7 @@ class ProviderManager:
                     chat_completion = self.client_groq.chat.completions.create(
                         messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}],
                         model=model_name,
+                        max_tokens=8192,
                         timeout=30.0
                     )
                     response_content = chat_completion.choices[0].message.content or ""
@@ -190,7 +196,8 @@ class ProviderManager:
                         raise Exception("OpenRouter istemcisi başlatılamadı")
                     completion = self.client_openrouter.chat.completions.create(
                         model=model_name,
-                        messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}]
+                        messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}],
+                        max_tokens=8192
                     )
                     response_content = completion.choices[0].message.content or ""
                     self.failure_counts[p_name] = 0
