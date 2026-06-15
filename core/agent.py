@@ -87,7 +87,7 @@ class MumyCodAgent:
             if tool_name == "write_file":
                 parts = tool_args.split(',', 1)
                 if len(parts) == 2:
-                    path = parts[0].replace('path=', '').strip().strip("'").strip('"')
+                    path = parts[0].replace('filepath=', '').replace('path=', '').strip().strip("'").strip('"')
                     content = parts[1].replace('content=', '').strip().strip("'").strip('"')
                     
                     if not path:
@@ -106,11 +106,12 @@ class MumyCodAgent:
                 return "[ERROR] Hata: write_file için dosya_yolu ve içerik gerekli."
             
             elif tool_name == "read_file":
-                filename = tool_args.replace('filename=', '').strip("'").strip('"')
+                filename = tool_args.replace('filepath=', '').replace('filename=', '').strip("'").strip('"')
                 if not filename:
                     return "[ERROR] Hata: Dosya adı boş."
                 
                 try:
+                    print(f"[DEBUG] Agent read_file çağırıyor: {filename}")
                     result = read_file(filename)
                     print(f"[DEBUG] read_file başarılı: {filename}")
                     return result
