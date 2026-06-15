@@ -163,8 +163,10 @@ class ProviderManager:
                     response = self.client_gemini.models.generate_content(
                         model=model_name,
                         contents=prompt,
-                        system_instruction=system_prompt,
-                        config=types.GenerateContentConfig(max_output_tokens=8192)
+                        config=types.GenerateContentConfig(
+                            system_instruction=system_prompt,
+                            max_output_tokens=8192
+                        )
                     )
                     response_text = response.text or ""
                     self.failure_counts[p_name] = 0  # Başarı durumunda sıfırla
