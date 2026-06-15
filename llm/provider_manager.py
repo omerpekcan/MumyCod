@@ -40,7 +40,7 @@ class ProviderManager:
         self.blacklist = set()
         self.failure_counts: Dict[str, int] = {}
         self.circuit_breakers: Dict[str, float] = {}
-        self.MAX_FAILURES = 3
+        self.MAX_FAILURES = 5
         self.RECOVERY_TIME = 300  # 5 dakika
 
         # Sağlayıcı listesini config üzerinden oluştur
