@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flask API Test</title>
+</head>
+<body>
+    <h1>Merhaba!</h1>
+    <button onclick="fetchHello()">Merhaba API'sini Çağır</button>
+    <p id="response"></p>
+
+    <script>
+        function fetchHello() {
+            fetch('/api/hello')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('response').innerText = data.message;
+                })
+                .catch(error => {
+                    console.error('Hata oluştu:', error);
+                    document.getElementById('response').innerText = 'API çağrılamadı.';
+                });
+        }
+    </script>
+</body>
+</html>
