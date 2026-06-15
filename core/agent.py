@@ -226,7 +226,7 @@ class MumyCodAgent:
                         # Ajanı tekrar tetikle
                         print("[DEBUG] Ajana hata ile tekrar soruluyor...")
                         retry_prompt = f"Orijinal talep: '{user_query}'\n\n{error_feedback}"
-                        retry_response = self.provider_manager.ask(retry_prompt)
+                        retry_response = self.provider_manager.ask(retry_prompt, system_prompt=self.system_prompt)
                         return retry_response
                     
                     # 3. Başarılı sonucu LLM'e geri gönder ve özetlet
