@@ -9,16 +9,16 @@ from tools.git_tools import GitTools
 from retrieval.retriever import CodeRetriever
 
 class MumyCodAgent:
-    COMMAND_MAP = {
-        '/çıkış': 'exit',
-        '/sağlayıcı': 'provider',
-        '/model': 'model',
-        '/temizle': 'clear',
-        '/durum': 'status'
-    }
-
     def __init__(self):
         print("MumyCod Terminal Başlatıldı")
+        # Dahili komut haritası
+        self._command_map = {
+            '/çıkış': 'exit',
+            '/sağlayıcı': 'provider',
+            '/model': 'model',
+            '/temizle': 'clear',
+            '/durum': 'status'
+        }
         # ProviderManager ile çoklu sağlayıcı desteği aktif
         self.provider_manager = ProviderManager()
         # brain.json dosyasının doğru yolda olduğundan emin oluyoruz
@@ -54,7 +54,7 @@ class MumyCodAgent:
     def handle_command(self, user_query: str) -> str:
         """Komutları işler ve eşleşen komut varsa çalıştırır."""
         if user_query.startswith('/'):
-            cmd = self.COMMAND_MAP.get(user_query.split()[0])
+            cmd = self._command_map.get(user_query.split()[0])
             if cmd:
                 return f"Komut işleniyor: {cmd}"
             return "Bilinmeyen komut"
