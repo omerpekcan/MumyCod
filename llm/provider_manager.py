@@ -116,7 +116,7 @@ class ProviderManager:
             print(f"[DEBUG] {provider_name} beklenmedik hata: {error_type} - {str(e)}")
             return "FAIL"
 
-    def ask(self, prompt: str) -> str:
+    def ask(self, prompt: str, system_prompt: str = "") -> str:
         """
         Sağlayıcılar arasında döngü kurar ve hata durumunda bir sonrakine geçer.
         Circuit Breaker mantığı ile hatalı sağlayıcıları izole eder.
@@ -158,7 +158,8 @@ class ProviderManager:
                         raise Exception("Gemini istemcisi başlatılamadı")
                     response = self.client_gemini.models.generate_content(
                         model=model_name,
-                        contents=prompt
+                        contents=prompt,
+                        system_instruction=system_prompt
                     )
                     response_text = response.text or ""
                     self.failure_counts[p_name] = 0  # Başarı durumunda sıfırla
@@ -172,7 +173,7 @@ class ProviderManager:
                     if self.client_groq is None:
                         raise Exception("Groq istemcisi başlatılamadı")
                     chat_completion = self.client_groq.chat.completions.create(
-                        messages=[{"role": "user", "content": prompt}],
+                        messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}],
                         model=model_name,
                         timeout=30.0
                     )
@@ -189,7 +190,7 @@ class ProviderManager:
                         raise Exception("OpenRouter istemcisi başlatılamadı")
                     completion = self.client_openrouter.chat.completions.create(
                         model=model_name,
-                        messages=[{"role": "user", "content": prompt}]
+                        messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}]
                     )
                     response_content = completion.choices[0].message.content or ""
                     self.failure_counts[p_name] = 0
