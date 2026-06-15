@@ -27,20 +27,20 @@ class MumyCodAgent:
         
         # Yapay zekaya nasıl davranması gerektiğini dikte eden sistem talimatı
         self.system_prompt = (
-            "Sen bir yazılım ajanı değilsin, sen bir ToolExecutionEngine'sin. "
-            "Kullanıcıdan bir dosya okuma veya yazma talebi geldiğinde, kesinlikle kendi kendine cevap verme. "
-            "Cevabın ZORUNLU OLARAK sadece [TOOL:arac_adi(argumanlar)] formatında başlamalıdır. "
-            "Eğer bu formatta cevap vermezsen kullanıcı işlemini gerçekleştiremez. "
-            "Asla rol yapma, işlemi gerçekleştirmek için gerekli aracı tetikle.\n\n"
-            "ARAÇLAR:\n"
-            "1. Dosya oluşturmak veya güncellemek için `write_file(filepath, content)` aracını kullanabilirsin.\n"
-            "2. Mevcut bir dosyayı okumak için `read_file(filepath)` aracını kullanabilirsin.\n"
-            "3. Terminal komutu çalıştırmak için `execute_command(command)` aracını kullanabilirsin.\n"
-            "4. Kod tabanında arama yapmak için `search_codebase(query)` aracını kullanabilirsin.\n"
-            "5. Git commit yapmak için `git_commit(message)` aracını kullanabilirsin.\n"
-            "6. Git push yapmak için `git_push()` aracını kullanabilirsin.\n"
-            "Bunu kullanmak için yanıtında şu formatı kullan:\n"
-            "[TOOL:write_file(dosya_yolu, içerik)] veya [TOOL:read_file(dosya_yolu)] veya [TOOL:execute_command(komut)] veya [TOOL:search_codebase(sorgu)] veya [TOOL:git_commit(mesaj)] veya [TOOL:git_push()]"
+            "Sen bir ToolExecutionEngine'sin. Görevin kullanıcıya açıklama yapmak değil, sadece araçları tetiklemektir.\n\n"
+            "KESİN KURALLAR:\n"
+            "1. Kullanıcıya asla kod örneği, talimat, açıklama veya 'Tabii yaparım' gibi cümleler yazma.\n"
+            "2. Yanıtın HER ZAMAN ve SADECE [TOOL:arac_adi(parametre='değer')] formatında olmalıdır.\n"
+            "3. Kullanıcıya ne yapması gerektiğini anlatma, işlemi bizzat araç çağrısı ile gerçekleştir.\n"
+            "4. Birden fazla işlem gerekiyorsa, her seferinde tek bir araç çağrısı yap.\n\n"
+            "ARAÇLAR VE TAM SYNTAX ÖRNEKLERİ:\n"
+            "- write_file: [TOOL:write_file(filepath='dizin/dosya.py', content='kod_icerigi')]\n"
+            "- read_file: [TOOL:read_file(filepath='dosya.txt')]\n"
+            "- execute_command: [TOOL:execute_command(command='pip install requests')]\n"
+            "- search_codebase: [TOOL:search_codebase(query='fonksiyon_adı')]\n"
+            "- git_commit: [TOOL:git_commit(message='özellik eklendi')]\n"
+            "- git_push: [TOOL:git_push()]\n\n"
+            "ÖNEMLİ: Dosya yazarken 'filepath' ve 'content' parametre isimlerini mutlaka kullan."
         )
         print("[DEBUG] MumyCodAgent başarıyla başlatıldı.")
 
@@ -237,7 +237,8 @@ class MumyCodAgent:
                     print(f"[DEBUG] Araç ayrıştırma hatası: {e}")
                     return f"[ERROR] Araç çalıştırılamadı: {str(e)}"
             
-            print("[DEBUG] Araç tespit edilmedi, doğrudan yanıt dönülüyor.")
+            print("[WARNING] Model tool çağrısı yapmadı, düz metin döndü.")
+            print(f"[DEBUG] Model Yanıtı: {response}")
             return response
             
         except Exception as e:
