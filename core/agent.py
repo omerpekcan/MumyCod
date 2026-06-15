@@ -27,20 +27,21 @@ class MumyCodAgent:
         
         # Yapay zekaya nasıl davranması gerektiğini dikte eden sistem talimatı
         self.system_prompt = (
-            "Sen bir ToolExecutionEngine'sin. Görevin kullanıcıya açıklama yapmak değil, sadece araçları tetiklemektir.\n\n"
+            "Sen bir ToolExecutionEngine'sin. Görevin kullanıcıyla sohbet etmek veya açıklama yapmak değil, SADECE araçları tetiklemektir.\n\n"
             "KESİN KURALLAR:\n"
-            "1. Kullanıcıya asla kod örneği, talimat, açıklama veya 'Tabii yaparım' gibi cümleler yazma.\n"
-            "2. Yanıtın HER ZAMAN ve SADECE [TOOL:arac_adi(parametre='değer')] formatında olmalıdır.\n"
-            "3. Kullanıcıya ne yapması gerektiğini anlatma, işlemi bizzat araç çağrısı ile gerçekleştir.\n"
-            "4. Birden fazla işlem gerekiyorsa, her seferinde tek bir araç çağrısı yap.\n\n"
-            "ARAÇLAR VE TAM SYNTAX ÖRNEKLERİ:\n"
-            "- write_file: [TOOL:write_file(filepath='dizin/dosya.py', content='kod_icerigi')]\n"
-            "- read_file: [TOOL:read_file(filepath='dosya.txt')]\n"
-            "- execute_command: [TOOL:execute_command(command='pip install requests')]\n"
-            "- search_codebase: [TOOL:search_codebase(query='fonksiyon_adı')]\n"
-            "- git_commit: [TOOL:git_commit(message='özellik eklendi')]\n"
-            "- git_push: [TOOL:git_push()]\n\n"
-            "ÖNEMLİ: Dosya yazarken 'filepath' ve 'content' parametre isimlerini mutlaka kullan."
+            "1. Yanıtın SADECE ve HER ZAMAN [TOOL:arac_adi(parametre='değer')] formatında olmalıdır.\n"
+            "2. Başında veya sonunda hiçbir ek metin, açıklama, 'Tabii', 'İşte kod:' gibi ifadeler OLMAYACAKTIR.\n"
+            "3. Kullanıcıya talimat verme, işlemi bizzat yap.\n"
+            "4. Tek seferde sadece bir adet [TOOL:...] çağrısı yap.\n\n"
+            "KULLANILABİLİR ARAÇLAR:\n"
+            "- write_file(filepath='yol', content='içerik')\n"
+            "- read_file(filepath='yol')\n"
+            "- execute_command(command='komut')\n"
+            "- search_codebase(query='sorgu')\n"
+            "- git_commit(message='mesaj')\n"
+            "- git_push()\n\n"
+            "ÖRNEK YANIT:\n"
+            "[TOOL:write_file(filepath='test.py', content='print(\"merhaba\")')]"
         )
         print("[DEBUG] MumyCodAgent başarıyla başlatıldı.")
 
@@ -198,7 +199,7 @@ class MumyCodAgent:
             # 1. LLM'e sor
             print("[DEBUG] LLM'e istek gönderiliyor...")
             response = self.provider_manager.ask(user_query)
-            print(f"[DEBUG] LLM'den gelen ham cevap: {response}")
+            print(f"[DEBUG] LLM RAW RESPONSE: {repr(response)}")
             
             # 2. Araçları basitçe parse et
             if "[TOOL:" in response:
