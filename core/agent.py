@@ -1,5 +1,6 @@
 import re
 import os
+import json
 import traceback
 from llm.provider_manager import ProviderManager
 from tools.file_tools import read_file, write_file
@@ -29,19 +30,21 @@ class MumyCodAgent:
         self.system_prompt = (
             "Sen bir ToolExecutionEngine'sin. Görevin kullanıcıyla sohbet etmek veya açıklama yapmak değil, SADECE araçları tetiklemektir.\n\n"
             "KESİN KURALLAR:\n"
-            "1. Yanıtın SADECE ve HER ZAMAN [TOOL:arac_adi(parametre='değer')] formatında olmalıdır.\n"
+            "1. Yanıtın SADECE ve HER ZAMAN [TOOL_JSON]{...}[/TOOL_JSON] formatında olmalıdır ve içindeki JSON valid olmalıdır.\n"
             "2. Başında veya sonunda hiçbir ek metin, açıklama, 'Tabii', 'İşte kod:' gibi ifadeler OLMAYACAKTIR.\n"
             "3. Kullanıcıya talimat verme, işlemi bizzat yap.\n"
-            "4. Tek seferde sadece bir adet [TOOL:...] çağrısı yap.\n\n"
+            "4. Tek seferde sadece bir adet [TOOL_JSON] çağrısı yap.\n"
+            "5. content alanı dahil TÜM string değerlerdeki özel karakterler (\\n, ', \", [, ], vb.) JSON string olarak otomatik escape edilmelidir.\n\n"
             "KULLANILABİLİR ARAÇLAR:\n"
-            "- write_file(filepath='yol', content='içerik')\n"
-            "- read_file(filepath='yol')\n"
-            "- execute_command(command='komut')\n"
-            "- search_codebase(query='sorgu')\n"
-            "- git_commit(message='mesaj')\n"
+            "- write_file(filepath, content)\n"
+            "- read_file(filepath)\n"
+            "- execute_command(command)\n"
+            "- search_codebase(query)\n"
+            "- git_commit(message)\n"
             "- git_push()\n\n"
-            "ÖRNEK YANIT:\n"
-            "[TOOL:write_file(filepath='test.py', content='print(\"merhaba\")')]"
+            "ÖRNEK YANITLAR:\n"
+            "[TOOL_JSON]{\"tool\": \"write_file\", \"args\": {\"filepath\": \"test.py\", \"content\": \"print(\\\"merhaba\\\")\"}}[/TOOL_JSON]\n"
+            "[TOOL_JSON]{\"tool\": \"read_file\", \"args\": {\"filepath\": \"main.py\"}}[/TOOL_JSON]"
         )
         print("[DEBUG] MumyCodAgent başarıyla başlatıldı.")
 
@@ -71,60 +74,49 @@ class MumyCodAgent:
         
         return (False, result)
 
-    def _execute_tool(self, tool_call: str) -> str:
-        """Araçları çalıştıran yardımcı metod."""
-        print(f"[DEBUG] Araç çalıştırılıyor: {tool_call}")
+    def _execute_tool(self, tool_name: str, args: dict) -> str:
+        """Araçları çalıştıran yardımcı metod (dict argümanları alır)."""
+        print(f"[DEBUG] Araç çalıştırılıyor: {tool_name}")
+        print(f"[DEBUG] Araç argümanları: {args}")
         
         try:
-            if "(" not in tool_call or ")" not in tool_call:
-                return "[ERROR] Hata: Geçersiz araç formatı."
-            
-            tool_name = tool_call.split('(')[0].strip()
-            tool_args = tool_call.split('(', 1)[1].rsplit(')', 1)[0].strip()
-            
-            print(f"[DEBUG] Tetiklenen Araç: {tool_name}")
-            print(f"[DEBUG] Temizlenmiş Argümanlar: {tool_args}")
-            
             if tool_name == "write_file":
-                parts = tool_args.split(',', 1)
-                if len(parts) == 2:
-                    path = parts[0].replace('filepath=', '').replace('path=', '').strip().strip("'").strip('"')
-                    content = parts[1].replace('content=', '').strip().strip("'").strip('"')
-                    
-                    if not path:
-                        return "[ERROR] Hata: Dosya yolu boş. Lütfen geçerli bir dosya yolu sağla."
-                    
-                    try:
-                        result = write_file(path, content)
-                        print(f"[DEBUG] write_file başarılı: {path}")
-                        return result
-                    except FileNotFoundError:
-                        return f"[ERROR] Hata: Dosya yolu yanlış veya dizin bulunamadı: {path}"
-                    except PermissionError:
-                        return f"[ERROR] Hata: Dosyaya yazma izni yok: {path}"
-                    except Exception as e:
-                        return f"[ERROR] Hata: Dosya yazılamadı: {str(e)}"
-                return "[ERROR] Hata: write_file için dosya_yolu ve içerik gerekli."
+                filepath = args.get("filepath", "")
+                content = args.get("content", "")
+                
+                if not filepath:
+                    return "[ERROR] Hata: Dosya yolu boş. Lütfen geçerli bir dosya yolu sağla."
+                
+                try:
+                    result = write_file(filepath, content)
+                    print(f"[DEBUG] write_file başarılı: {filepath}")
+                    return result
+                except FileNotFoundError:
+                    return f"[ERROR] Hata: Dosya yolu yanlış veya dizin bulunamadı: {filepath}"
+                except PermissionError:
+                    return f"[ERROR] Hata: Dosyaya yazma izni yok: {filepath}"
+                except Exception as e:
+                    return f"[ERROR] Hata: Dosya yazılamadı: {str(e)}"
             
             elif tool_name == "read_file":
-                filename = tool_args.replace('filepath=', '').replace('filename=', '').strip("'").strip('"')
-                if not filename:
+                filepath = args.get("filepath", "")
+                if not filepath:
                     return "[ERROR] Hata: Dosya adı boş."
                 
                 try:
-                    print(f"[DEBUG] Agent read_file çağırıyor: {filename}")
-                    result = read_file(filename)
-                    print(f"[DEBUG] read_file başarılı: {filename}")
+                    print(f"[DEBUG] Agent read_file çağırıyor: {filepath}")
+                    result = read_file(filepath)
+                    print(f"[DEBUG] read_file başarılı: {filepath}")
                     return result
                 except FileNotFoundError:
-                    return f"[ERROR] Hata: Dosya bulunamadı: {filename}"
+                    return f"[ERROR] Hata: Dosya bulunamadı: {filepath}"
                 except PermissionError:
-                    return f"[ERROR] Hata: Dosya okuma izni yok: {filename}"
+                    return f"[ERROR] Hata: Dosya okuma izni yok: {filepath}"
                 except Exception as e:
                     return f"[ERROR] Hata: Dosya okunamadı: {str(e)}"
             
             elif tool_name == "execute_command":
-                command = tool_args.strip("'").strip('"')
+                command = args.get("command", "")
                 if not command:
                     return "[ERROR] Hata: Komut boş."
                 
@@ -136,7 +128,7 @@ class MumyCodAgent:
                     return f"[ERROR] Hata: Komut çalıştırılamadı: {str(e)}"
             
             elif tool_name == "search_codebase":
-                query = tool_args.strip("'").strip('"')
+                query = args.get("query", "")
                 if not query:
                     return "[ERROR] Hata: Arama sorgusu boş."
                 
@@ -150,7 +142,7 @@ class MumyCodAgent:
                     return f"[ERROR] Hata: Arama yapılamadı: {str(e)}"
             
             elif tool_name == "git_commit":
-                message = tool_args.strip("'").strip('"')
+                message = args.get("message", "")
                 if not message:
                     return "[ERROR] Hata: Commit mesajı boş."
                 
@@ -201,17 +193,35 @@ class MumyCodAgent:
             response = self.provider_manager.ask(user_query, system_prompt=self.system_prompt)
             print(f"[DEBUG] LLM RAW RESPONSE: {repr(response)}")
             
-            # 2. Araçları basitçe parse et
-            if "[TOOL:" in response:
+            # 2. JSON tabanlı araç format'ını parse et
+            if "[TOOL_JSON]" in response:
                 try:
-                    # Regex ile daha güvenli bir yakalama yapalım
-                    match = re.search(r"\[TOOL:(.*?)\]", response, re.DOTALL)
+                    # JSON formatı: [TOOL_JSON]{...}[/TOOL_JSON]
+                    match = re.search(r"\[TOOL_JSON\](.*?)\[/TOOL_JSON\]", response, re.DOTALL)
                     if not match:
+                        print("[DEBUG] [TOOL_JSON] etiketi bulundu ancak regex eşleşmedi")
                         return response
-                    tool_call = match.group(1).strip()
+                    
+                    json_str = match.group(1).strip()
+                    print(f"[DEBUG] Çıkarılan JSON: {json_str}")
+                    
+                    # JSON'u parse et
+                    try:
+                        tool_data = json.loads(json_str)
+                    except json.JSONDecodeError as je:
+                        print(f"[DEBUG] JSON parse hatası: {je}")
+                        return f"[ERROR] Geçersiz JSON formatı: {str(je)}"
+                    
+                    tool_name = tool_data.get("tool", "")
+                    tool_args = tool_data.get("args", {})
+                    
+                    if not tool_name:
+                        return "[ERROR] Hata: Tool adı belirtilmemiş."
+                    
+                    print(f"[DEBUG] Araç adı: {tool_name}")
                     
                     # Aracı çalıştır
-                    result = self._execute_tool(tool_call)
+                    result = self._execute_tool(tool_name, tool_args)
                     print(f"[DEBUG] Araç sonucu: {result}")
                     
                     # Araç çıktısında hata var mı kontrol et
@@ -234,8 +244,12 @@ class MumyCodAgent:
                     print("[DEBUG] Araç sonucu LLM'e özetletiliyor...")
                     final_response = self.provider_manager.ask(final_prompt)
                     return final_response
+                except json.JSONDecodeError as je:
+                    print(f"[DEBUG] JSON decode hatası: {je}")
+                    return f"[ERROR] JSON parse edilemedi: {str(je)}"
                 except Exception as e:
                     print(f"[DEBUG] Araç ayrıştırma hatası: {e}")
+                    traceback.print_exc()
                     return f"[ERROR] Araç çalıştırılamadı: {str(e)}"
             
             print("[WARNING] Model tool çağrısı yapmadı, düz metin döndü.")
