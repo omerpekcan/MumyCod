@@ -198,7 +198,7 @@ class MumyCodAgent:
         try:
             # 1. LLM'e sor
             print("[DEBUG] LLM'e istek gönderiliyor...")
-            response = self.provider_manager.ask(user_query)
+            response = self.provider_manager.ask(user_query, system_prompt=self.system_prompt)
             print(f"[DEBUG] LLM RAW RESPONSE: {repr(response)}")
             
             # 2. Araçları basitçe parse et
