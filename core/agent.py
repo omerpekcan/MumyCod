@@ -62,16 +62,17 @@ class MumyCodAgent:
     def _detect_error_in_result(self, result: str) -> tuple[bool, str]:
         """Araç çıktısında hata var mı kontrol eder."""
         error_keywords = [
-            r'hata', r'error', r'false', r'başarısız', 
+            r'komut hata ile sonuçlandı', r'başarısız', 
             r'failed', r'bulunamadı', r'not found', r'exception',
-            r'traceback', r'errno', r'invalid path', r'yolu yanlış'
+            r'traceback', r'errno', r'invalid path', r'yolu yanlış',
+            r'error:', r'hata:' # ": " ile daha spesifik eşleşme
         ]
         
         result_lower = result.lower()
         
         for keyword in error_keywords:
             if re.search(keyword, result_lower):
-                print(f"[DEBUG] Hata algılandı: {keyword}")
+                print(f"[DEBUG] Hata algılandı: '{keyword}'")
                 return (True, result)
         
         return (False, result)
