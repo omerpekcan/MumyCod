@@ -1,5 +1,6 @@
 import subprocess
 import locale
+import platform # platform modülünü ekledik
 from subprocess import Popen, PIPE, TimeoutExpired
 
 def decode_output(output_bytes: bytes) -> str:
@@ -30,11 +31,16 @@ def execute_command(command: str, timeout: int = 10) -> str:
     Sonsuz döngüye giren veya GUI açan komutlar için zaman aşımı yönetimi yapar.
     """
     try:
+        creationflags = 0
+        if platform.system() == "Windows":
+            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+
         with Popen(
             command,
             shell=True,
             stdout=PIPE,
-            stderr=PIPE
+            stderr=PIPE,
+            creationflags=creationflags # Windows için yeni process grubu oluştur
         ) as process:
             try:
                 stdout_bytes, stderr_bytes = process.communicate(timeout=timeout)
@@ -46,8 +52,13 @@ def execute_command(command: str, timeout: int = 10) -> str:
                 
                 return stdout if stdout else "Komut başarıyla çalıştı (çıktı yok)."
             except TimeoutExpired:
-                process.kill()
-                stdout_bytes, stderr_bytes = process.communicate()
+                if platform.system() == "Windows":
+                    # Windows'ta tüm process ağacını sonlandır
+                    subprocess.run(f"taskkill /F /T /PID {process.pid}", shell=True, capture_output=True)
+                else:
+                    process.kill() # Diğer OS'lerde sadece ana process'i öldür
+                
+                stdout_bytes, stderr_bytes = process.communicate() # Kalan çıktıyı oku
                 stdout = decode_output(stdout_bytes) if stdout_bytes else ""
                 stderr = decode_output(stderr_bytes) if stderr_bytes else ""
                 
