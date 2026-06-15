@@ -24,8 +24,9 @@ class MumyCodAgent:
         # brain.json dosyasının doğru yolda olduğundan emin oluyoruz
         self.retriever = CodeRetriever(brain_path="memory/brain.json")
         self.git_tools = GitTools()
-        self.history = []
-        
+        self.history = [] # Mesaj geçmişi {"role": "user"/"assistant"/"tool"/"system_error", "content": "..."}
+        self.MAX_ITERATIONS = 10 # Maksimum adım sayısı
+
         # Yapay zekaya nasıl davranması gerektiğini dikte eden sistem talimatı
         self.system_prompt = (
             "Sen bir ToolExecutionEngine'sin. Görevin kullanıcıyla sohbet etmek veya açıklama yapmak değil, SADECE araçları tetiklemektir.\n\n"
@@ -34,7 +35,8 @@ class MumyCodAgent:
             "2. Başında veya sonunda hiçbir ek metin, açıklama, 'Tabii', 'İşte kod:' gibi ifadeler OLMAYACAKTIR.\n"
             "3. Kullanıcıya talimat verme, işlemi bizzat yap.\n"
             "4. Tek seferde sadece bir adet [TOOL_JSON] çağrısı yap.\n"
-            "5. content alanı dahil TÜM string değerlerdeki özel karakterler (\\n, ', \", [, ], vb.) JSON string olarak otomatik escape edilmelidir.\n\n"
+            "5. content alanı dahil TÜM string değerlerdeki özel karakterler (\\n, ', \", [, ], vb.) JSON string olarak otomatik escape edilmelidir.\n"
+            "6. Görev birden fazla adım gerektiriyorsa, her adımda bir [TOOL_JSON] çağrısı yap. TÜM adımlar tamamlandığında, [TOOL_JSON] KULLANMADAN düz metinle kullanıcıya özet/sonuç bildir. Bu, görevin bittiğinin işaretidir.\n\n"
             "KULLANILABİLİR ARAÇLAR:\n"
             "- write_file(filepath, content)\n"
             "- read_file(filepath)\n"
@@ -179,84 +181,115 @@ class MumyCodAgent:
             print(f"[DEBUG] Araç çalıştırma hatası: {str(e)}")
             return f"[ERROR] Hata: Araç çalıştırılırken hata oluştu: {str(e)}"
 
+    def _format_messages_for_llm(self) -> str:
+        """
+        self.history'deki mesajları LLM'e gönderilecek tek bir prompt string'ine dönüştürür.
+        """
+        formatted_prompt_parts = []
+        
+        # Geçmiş konuşmayı history'den ekle
+        for msg in self.history:
+            if msg["role"] == "user":
+                formatted_prompt_parts.append(f"Kullanıcı: {msg['content']}")
+            elif msg["role"] == "assistant":
+                formatted_prompt_parts.append(f"Asistan: {msg['content']}")
+            elif msg["role"] == "tool":
+                formatted_prompt_parts.append(f"Araç Sonucu: {msg['content']}")
+            elif msg["role"] == "system_error":
+                formatted_prompt_parts.append(f"Sistem Hatası: {msg['content']}")
+        
+        return "\n".join(formatted_prompt_parts)
+
+
     def ask(self, user_query: str) -> str:
-        # Komut kontrolü
         cmd_result = self.handle_command(user_query)
         if cmd_result:
+            # Komut işlendiyse, history'yi temizle ve komut sonucunu döndür
+            self.history = [] 
             return cmd_result
 
         print(f"\nKullanıcı >> {user_query}")
-        
-        try:
-            # 1. LLM'e sor
-            print("[DEBUG] LLM'e istek gönderiliyor...")
-            response = self.provider_manager.ask(user_query, system_prompt=self.system_prompt)
-            print(f"[DEBUG] LLM RAW RESPONSE: {repr(response)}")
+        self.history.append({"role": "user", "content": user_query})
+
+        for iteration in range(1, self.MAX_ITERATIONS + 1):
+            print(f"[DEBUG] Iterasyon {iteration}/{self.MAX_ITERATIONS}")
             
-            # 2. JSON tabanlı araç format'ını parse et
-            if "[TOOL_JSON]" in response:
-                try:
-                    # JSON formatı: [TOOL_JSON]{...}[/TOOL_JSON]
-                    match = re.search(r"\[TOOL_JSON\](.*?)\[/TOOL_JSON\]", response, re.DOTALL)
-                    if not match:
-                        print("[DEBUG] [TOOL_JSON] etiketi bulundu ancak regex eşleşmedi")
-                        return response
-                    
-                    json_str = match.group(1).strip()
-                    print(f"[DEBUG] Çıkarılan JSON: {json_str}")
-                    
-                    # JSON'u parse et
+            try:
+                # 1. LLM'e sor
+                current_prompt = self._format_messages_for_llm()
+                print(f"[DEBUG] LLM'e gönderilen prompt (iterasyon {iteration}):\n{current_prompt[:500]}...") # İlk 500 karakteri logla
+                response = self.provider_manager.ask(current_prompt, system_prompt=self.system_prompt)
+                print(f"[DEBUG] LLM RAW RESPONSE (iterasyon {iteration}): {repr(response)}")
+                self.history.append({"role": "assistant", "content": response})
+
+                # 2. JSON tabanlı araç format'ını parse et
+                if "[TOOL_JSON]" in response:
                     try:
-                        tool_data = json.loads(json_str)
-                    except json.JSONDecodeError as je:
-                        print(f"[DEBUG] JSON parse hatası: {je}")
-                        return f"[ERROR] Geçersiz JSON formatı: {str(je)}"
-                    
-                    tool_name = tool_data.get("tool", "")
-                    tool_args = tool_data.get("args", {})
-                    
-                    if not tool_name:
-                        return "[ERROR] Hata: Tool adı belirtilmemiş."
-                    
-                    print(f"[DEBUG] Araç adı: {tool_name}")
-                    
-                    # Aracı çalıştır
-                    result = self._execute_tool(tool_name, tool_args)
-                    print(f"[DEBUG] Araç sonucu: {result}")
-                    
-                    # Araç çıktısında hata var mı kontrol et
-                    is_error, error_msg = self._detect_error_in_result(result)
-                    
-                    if is_error:
-                        print("[DEBUG] Araç çalıştırma hatasını algıladı, ajana geri bildiriliyor...")
-                        # Hata geri bildirimi (feedback loop)
-                        error_feedback = f"[SYSTEM_ERROR] Son yapılan işlem başarısız oldu: {error_msg}. Lütfen hatayı analiz et ve farklı bir yaklaşımla (başka bir araçla veya parametreyle) tekrar dene."
-                        print(f"[DEBUG] Sistem hatası mesajı: {error_feedback}")
+                        match = re.search(r"\[TOOL_JSON\](.*?)\[/TOOL_JSON\]", response, re.DOTALL)
+                        if not match:
+                            print("[DEBUG] [TOOL_JSON] etiketi bulundu ancak regex eşleşmedi")
+                            # Hata olarak kabul edip modele geri bildirimde bulun
+                            error_msg = "[ERROR] Model geçerli bir [TOOL_JSON] formatı döndüremedi. Lütfen düzgün bir [TOOL_JSON] formatı kullan."
+                            self.history.append({"role": "system_error", "content": error_msg})
+                            continue # Bir sonraki iterasyona geç
                         
-                        # Ajanı tekrar tetikle
-                        print("[DEBUG] Ajana hata ile tekrar soruluyor...")
-                        retry_prompt = f"Orijinal talep: '{user_query}'\n\n{error_feedback}"
-                        retry_response = self.provider_manager.ask(retry_prompt, system_prompt=self.system_prompt)
-                        return retry_response
-                    
-                    # 3. Başarılı sonucu LLM'e geri gönder ve özetlet
-                    final_prompt = f"Kullanıcı sorusu: '{user_query}'.\n\nAraç çalıştırıldı. Sonuç:\n{result}\n\nLütfen bu sonucu kullanıcıya özetle."
-                    print("[DEBUG] Araç sonucu LLM'e özetletiliyor...")
-                    final_response = self.provider_manager.ask(final_prompt)
-                    return final_response
-                except json.JSONDecodeError as je:
-                    print(f"[DEBUG] JSON decode hatası: {je}")
-                    return f"[ERROR] JSON parse edilemedi: {str(je)}"
-                except Exception as e:
-                    print(f"[DEBUG] Araç ayrıştırma hatası: {e}")
-                    traceback.print_exc()
-                    return f"[ERROR] Araç çalıştırılamadı: {str(e)}"
-            
-            print("[WARNING] Model tool çağrısı yapmadı, düz metin döndü.")
-            print(f"[DEBUG] Model Yanıtı: {response}")
-            return response
-            
-        except Exception as e:
-            print("[DEBUG] !!! HATA YAKALANDI !!!")
-            traceback.print_exc()
-            return f"HATA: {str(e)}"
+                        json_str = match.group(1).strip()
+                        print(f"[DEBUG] Çıkarılan JSON (iterasyon {iteration}): {json_str}")
+                        
+                        try:
+                            tool_data = json.loads(json_str)
+                        except json.JSONDecodeError as je:
+                            error_msg = f"[ERROR] Geçersiz JSON formatı: {str(je)}. Lütfen JSON formatını kontrol et."
+                            print(f"[DEBUG] JSON parse hatası (iterasyon {iteration}): {error_msg}")
+                            self.history.append({"role": "system_error", "content": error_msg})
+                            continue # Bir sonraki iterasyona geç
+                        
+                        tool_name = tool_data.get("tool", "")
+                        tool_args = tool_data.get("args", {})
+                        
+                        if not tool_name:
+                            error_msg = "[ERROR] Hata: Tool adı belirtilmemiş. Lütfen 'tool' alanını doldur."
+                            print(f"[DEBUG] Tool adı eksik (iterasyon {iteration}): {error_msg}")
+                            self.history.append({"role": "system_error", "content": error_msg})
+                            continue # Bir sonraki iterasyona geç
+                        
+                        print(f"[DEBUG] Araç adı (iterasyon {iteration}): {tool_name}")
+                        
+                        # Aracı çalıştır
+                        result = self._execute_tool(tool_name, tool_args)
+                        print(f"[DEBUG] Araç sonucu (iterasyon {iteration}): {result}")
+                        
+                        # Araç çıktısında hata var mı kontrol et
+                        is_error, error_msg_from_tool = self._detect_error_in_result(result)
+                        
+                        if is_error:
+                            print(f"[DEBUG] Araç çalıştırma hatası algılandı (iterasyon {iteration}), ajana geri bildiriliyor...")
+                            # Hata geri bildirimi (feedback loop)
+                            error_feedback = f"Son yapılan işlem başarısız oldu: {error_msg_from_tool}. Lütfen hatayı analiz et ve farklı bir yaklaşımla (başka bir araçla veya parametreyle) tekrar dene."
+                            self.history.append({"role": "system_error", "content": error_feedback})
+                            # Döngü devam edecek, LLM bir sonraki iterasyonda hatayı görecek.
+                        else:
+                            self.history.append({"role": "tool", "content": result})
+                            # Başarılı araç çağrısı, döngü devam edecek
+                            
+                    except Exception as e:
+                        print(f"[DEBUG] Araç ayrıştırma veya çalıştırma hatası (iterasyon {iteration}): {e}")
+                        traceback.print_exc()
+                        self.history.append({"role": "system_error", "content": f"[ERROR] Araç çalıştırılırken genel hata oluştu: {str(e)}"})
+                        # Döngü devam edecek
+                else:
+                    # Model tool çağrısı yapmadıysa, görevin tamamlandığı varsayılır.
+                    print(f"[WARNING] Model tool çağrısı yapmadı, düz metin döndü (iterasyon {iteration}). Görev tamamlandı.")
+                    final_response_content = response
+                    self.history = [] # History'yi temizle
+                    return final_response_content
+                
+            except Exception as e:
+                print(f"[DEBUG] !!! HATA YAKALANDI (iterasyon {iteration}) !!!")
+                traceback.print_exc()
+                self.history = [] # History'yi temizle
+                return f"HATA: {str(e)}"
+        
+        # Maksimum iterasyon sayısına ulaşıldığında
+        self.history = [] # History'yi temizle
+        return "Maksimum adım sayısına ulaşıldı, görev tamamlanamadı. Lütfen daha küçük adımlarla tekrar dene veya ajana daha net talimatlar ver."
