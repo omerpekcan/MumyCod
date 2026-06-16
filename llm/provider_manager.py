@@ -28,7 +28,7 @@ class ConfigLoader:
                 {
                     "name": "openrouter",
                     "api_key": os.getenv("OPENROUTER_API_KEY"),
-                    "model": "google/gemini-2.0-flash-lite-preview:free"
+                    "model": "qwen/qwen3-next-80b-a3b-instruct:free"
                 }
             ]
         }
