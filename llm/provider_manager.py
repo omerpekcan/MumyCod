@@ -28,7 +28,7 @@ class ConfigLoader:
                 {
                     "name": "openrouter",
                     "api_key": os.getenv("OPENROUTER_API_KEY"),
-                    "model": "qwen/qwen3-next-80b-a3b-instruct:free"
+                    "model": "openai/gpt-oss-120b:free"
                 }
             ]
         }
