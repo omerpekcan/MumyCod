@@ -130,22 +130,6 @@ Bu proje MIT Lisansı ile lisanslanmıştır.
 text
 
 
----
-
-## 📝 **Düzenleme Talimatları:**
-
-1. **README.md dosyasını aç:**
-   - VS Code'da soldaki dosya gezgininden `README.md`'ye tıkla.
-
-2. **Mevcut içeriği sil ve yukarıdaki metni yapıştır.**
-
-3. **Kaydet** (`Ctrl + S`).
-
-4. **GitHub'a gönder:**
-```bash
-git add README.md
-git commit -m "docs: README tamamen yenilendi"
-git push
 
 🎯 Neler Ekledim?
 
