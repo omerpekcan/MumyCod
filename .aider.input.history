@@ -1142,3 +1142,35 @@
 +Çözüm: subprocess.Popen çağrısına creationflags=subprocess.CREATE_NEW_PROCESS_GROUP ekle (Windows'a özel, import platform ile os kontrolü yap). TimeoutExpired durumunda process.kill() yerine, Windows'ta "taskkill /F /T /PID {process.pid}" komutunu subprocess.run ile çalıştırarak tüm process ağacını (alt process'ler dahil) sonlandır. Linux/Mac için mevcut process.kill() davranışını koru (os.name kontrolü ile).
 +
 +Ayrıca system_prompt'a şu kuralı ekle: "Flask, Django gibi web sunucularını çalıştırırken app.run(debug=True) kullanma, debug=False kullan veya flask sunucusunu hiç çalıştırmadan sadece dosyanın syntax hatası olup olmadığını kontrol etmek için 'python -m py_compile dosya.py' komutunu kullan."
+
+# 2026-06-16 02:08:03.863555
++core/agent.py içindeki system_prompt'a şu kuralı ekle: "Eğer kullanıcının mesajı bir yazılım görevi değilse (örn. selam, nasılsın, teşekkürler gibi sohbet mesajları), [TOOL_JSON] KULLANMA, düz metinle kısa ve nazikçe yanıt ver."
+
+# 2026-06-16 02:08:06.466473
++y
+
+# 2026-06-16 02:36:31.117200
++core/agent.py içindeki system_prompt'a şu kuralı ekle: "Eğer kullanıcının mesajı bir yazılım görevi değilse (örn. selam, nasılsın, teşekkürler gibi sohbet mesajları), [TOOL_JSON] KULLANMA, düz metinle kısa ve nazikçe yanıt ver."
+
+# 2026-06-16 02:36:45.339301
++/exit
+
+# 2026-06-16 02:38:16.431241
++aider core/agent.py
+
+# 2026-06-16 02:38:18.983985
++y
+
+# 2026-06-16 02:39:13.930800
++system_prompt içindeki kurallar listesine şu maddeyi ekle: "8. Eğer kullanıcının mesajı bir yazılım görevi değilse (örn. selam, nasılsın, teşekkürler gibi sohbet mesajları), [TOOL_JSON] KULLANMA, düz metinle kısa ve nazikçe yanıt ver."
+
+# 2026-06-16 02:54:43.863976
++aider mumycod selam yazdığımda kısa bir cevap yazmasına rağmen neden binlerce token harcıyor bunun cevabını bulup bana açıklarmısın
+
+# 2026-06-16 02:56:03.052323
++y
+
+# 2026-06-16 02:56:52.049253
++ aider mumycod selam yazdığımda kısa bir cevap yazmasına rağmen neden binlerce token harcıyor bunun cevabını bulup ban
++> a açıklarmısın
++

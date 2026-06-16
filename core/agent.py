@@ -26,10 +26,12 @@ class MumyCodAgent:
         self.git_tools = GitTools()
         self.history = [] # Mesaj geçmişi {"role": "user"/"assistant"/"tool"/"system_error", "content": "..."}
         self.MAX_ITERATIONS = 10 # Maksimum adım sayısı
+        self.TERMINAL_TOOLS = ["write_file", "git_commit", "git_push"]  # Bunlar başarılı olunca görev tamamlanır
 
         # Yapay zekaya nasıl davranması gerektiğini dikte eden sistem talimatı
         self.system_prompt = (
             "Sen bir ToolExecutionEngine'sin. Görevin kullanıcıyla sohbet etmek veya açıklama yapmak değil, SADECE araçları tetiklemektir.\n\n"
+            "İSTİSNA: Eğer kullanıcının mesajı bir görev, komut veya araç gerektiren bir istek değilse (selamlaşma, \"nasılsın\", teşekkür, basit sohbet gibi), bu durumda hiçbir tool çağırmadan doğrudan kısa ve doğal bir metin yanıtı ver.\n\n"
             "KESİN KURALLAR:\n"
             "1. Yanıtın SADECE ve HER ZAMAN [TOOL_JSON]{...}[/TOOL_JSON] formatında olmalıdır ve içindeki JSON valid olmalıdır.\n"
             "2. Başında veya sonunda hiçbir ek metin, açıklama, 'Tabii', 'İşte kod:' gibi ifadeler OLMAYACAKTIR.\n"
@@ -38,7 +40,8 @@ class MumyCodAgent:
             "5. content alanı dahil TÜM string değerlerdeki özel karakterler (\\n, ', \", [, ], vb.) JSON string olarak otomatik escape edilmelidir.\n"
             "6. Görev birden fazla adım gerektiriyorsa, her adımda bir [TOOL_JSON] çağrısı yap. TÜM adımlar tamamlandığında, [TOOL_JSON] KULLANMADAN düz metinle kullanıcıya özet/sonuç bildir. Bu, görevin bittiğinin işaretidir.\n"
             "7. Flask, Django gibi web sunucularını çalıştırırken `app.run(debug=True)` kullanma. `debug=False` kullan veya Flask/Django sunucusunu hiç çalıştırmadan sadece dosyanın syntax hatası olup olmadığını kontrol etmek için `'python -m py_compile dosya.py'` komutunu kullan.\n"
-            "8. Eğer kullanıcının mesajı bir yazılım görevi değilse (örn. selam, nasılsın, teşekkürler gibi sohbet mesajları), [TOOL_JSON] KULLANMA, düz metinle kısa ve nazikçe yanıt ver.\n\n"
+            "8. Eğer kullanıcının mesajı bir yazılım görevi değilse (örn. selam, nasılsın, teşekkürler gibi sohbet mesajları), [TOOL_JSON] KULLANMA, düz metinle kısa ve nazikçe yanıt ver.\n"
+            "9. Terminal araçlar (write_file, git_commit, git_push) başarıyla çalıştığında, görev otomatik olarak tamamlanır ve loop sonlandırılır. Bu araçlardan sonra ek adım beklenmeyin.\n\n"
             "KULLANILABİLİR ARAÇLAR:\n"
             "- write_file(filepath, content)\n"
             "- read_file(filepath)\n"
@@ -273,6 +276,11 @@ class MumyCodAgent:
                             # Döngü devam edecek, LLM bir sonraki iterasyonda hatayı görecek.
                         else:
                             self.history.append({"role": "tool", "content": result})
+                            # Terminal araçlar başarılı olunca loop'u sonlandır
+                            if tool_name in self.TERMINAL_TOOLS:
+                                print(f"[INFO] Terminal araç başarıyla çalıştırıldı: {tool_name}. Görev tamamlandı.")
+                                self.history = [] # History'yi temizle
+                                return result
                             # Başarılı araç çağrısı, döngü devam edecek
                             
                     except Exception as e:
@@ -282,7 +290,7 @@ class MumyCodAgent:
                         # Döngü devam edecek
                 else:
                     # Model tool çağrısı yapmadıysa, görevin tamamlandığı varsayılır.
-                    print(f"[WARNING] Model tool çağrısı yapmadı, düz metin döndü (iterasyon {iteration}). Görev tamamlandı.")
+                    print(f"[INFO] Model sohbet yanıtı verdi (tool gerekmedi) (iterasyon {iteration}). Görev tamamlandı.")
                     final_response_content = response
                     self.history = [] # History'yi temizle
                     return final_response_content
