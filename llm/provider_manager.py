@@ -42,8 +42,6 @@ class ProviderManager:
         self.client_groq = None
         self.client_openrouter = None
         
-        print("[DEBUG] .env dosyası yükleniyor...")
-        
         self.blacklist = set()
         self.failure_counts: Dict[str, int] = {}
         self.circuit_breakers: Dict[str, float] = {}
@@ -53,18 +51,10 @@ class ProviderManager:
         # Sağlayıcı listesini config üzerinden oluştur
         self.providers = [self.config["primary"]] + self.config["fallbacks"]
         
-        # API anahtarlarının varlığını kontrol et ve log bas
-        print("[DEBUG] API anahtarları kontrol ediliyor:")
+        # API anahtarlarının varlığını kontrol et (güvenli log)
         for provider in self.providers:
-            status = "[OK]" if provider["api_key"] else "[MISSING]"
-            key_preview = f"(ilk 10 karakter: {provider['api_key'][:10]}...)" if provider["api_key"] else "bulunamadı"
-            print(f"  {status} {provider['name'].upper()}: API anahtarı {key_preview}")
-        
-        # API anahtarlarının varlığını kontrol et ve log bas (GÜVENLİ)
-        print("[DEBUG] API anahtarları kontrol ediliyor:")
-        for provider in self.providers:
-            status = "[OK]" if provider["api_key"] else "[MISSING]"
-            print(f"  {status} {provider['name'].upper()}")
+            if not provider["api_key"]:
+                print(f"[WARN] {provider['name'].upper()} API anahtarı bulunamadı.")
 
     def _get_status_code(self, e):
         """Hata nesnesinden HTTP durum kodunu çıkarır."""
@@ -82,41 +72,25 @@ class ProviderManager:
         error_type = type(e).__name__
         error_msg = str(e).lower()
         
-        print(f"[DEBUG] {provider_name} hata detayı - Tip: {error_type}, Kod: {status_code}")
-        
         # 429 (Rate Limit) ve 503 (Service Unavailable) hatalarında
         if status_code in [429, 503]:
-            reason = "Rate limit aşıldı" if status_code == 429 else "Servis geçici olarak kullanılamıyor"
-            print(f"[DEBUG] {provider_name} {status_code} hatası: {reason}. Bir sonraki sağlayıcıya geçiliyor.")
             return "NEXT"
-        
         # 401 (Unauthorized) ve 404 (Not Found) hatalarında blacklist
         elif status_code in [401, 404]:
-            reason = "API anahtarı geçersiz veya yanlış" if status_code == 401 else "Endpoint bulunamadı"
-            print(f"[DEBUG] {provider_name} {status_code} hatası: {reason}. Blacklist'e alınıyor.")
             self.blacklist.add(provider_name)
             return "BLACKLIST"
-        
         # Connection hatalarında
         elif "connectionerror" in error_type.lower() or "timeout" in error_msg:
-            print(f"[DEBUG] {provider_name} bağlantı hatası: Ağ problemi veya timeout. Bir sonraki sağlayıcıya geçiliyor.")
             return "NEXT"
-        
         # Authentication hatalarında
         elif "authentication" in error_msg or "unauthenticated" in error_msg:
-            print(f"[DEBUG] {provider_name} kimlik doğrulama hatası: API anahtarı geçersiz. Blacklist'e alınıyor.")
             self.blacklist.add(provider_name)
             return "BLACKLIST"
-        
         # Type hatalarında (model/params yanlış)
         elif "typeerror" in error_type.lower():
-            print(f"[DEBUG] {provider_name} tip hatası: Model veya parametreler yanlış. Blacklist'e alınıyor.")
             self.blacklist.add(provider_name)
             return "BLACKLIST"
-        
-        # Diğer hatalar
         else:
-            print(f"[DEBUG] {provider_name} beklenmedik hata: {error_type} - {str(e)}")
             return "FAIL"
 
     def ask(self, prompt: str, system_prompt: str = "") -> str:
@@ -124,11 +98,6 @@ class ProviderManager:
         Sağlayıcılar arasında döngü kurar ve hata durumunda bir sonrakine geçer.
         Circuit Breaker mantığı ile hatalı sağlayıcıları izole eder.
         """
-        print("[DEBUG] Prompt işlenmek üzere sağlayıcılara gönderiliyor...")
-        print(f"[DEBUG] SYSTEM PROMPT UZUNLUĞU: {len(system_prompt)} karakter")
-        print(f"[DEBUG] SYSTEM PROMPT İLK 100 KARAKTER: {system_prompt[:100]}")
-
-        
         last_error = None
         attempted_providers = []
         current_time = time.time()
@@ -139,27 +108,24 @@ class ProviderManager:
             # Circuit Breaker Kontrolü
             if p_name in self.circuit_breakers:
                 if current_time < self.circuit_breakers[p_name]:
-                    print(f"[DEBUG] {p_name} devre dışı (Circuit Open), atlanıyor.")
                     continue
                 else:
-                    print(f"[DEBUG] {p_name} deneme aşamasında (Circuit Half-Open)...")
+                    pass  # Half-open, deneme devam eder
 
             if p_name in self.blacklist:
-                print(f"[DEBUG] {p_name} blacklist'te, atlaniyor.")
                 continue
             
             if not provider["api_key"]:
-                print(f"[DEBUG] {provider['name']} için API anahtarı yok, atlaniyor.")
                 continue
             
-            attempted_providers.append(provider["name"])
+            attempted_providers.append(p_name)
             
             try:
-                print(f"[DEBUG] {provider['name']} ile deneniyor... (Girişim: {len(attempted_providers)}/{len([p for p in self.providers if p['api_key']])})")
-                
-                if provider["name"] == "gemini":
+                # Hangi sağlayıcının kullanıldığını göster
+                print(f"Kullanılan sağlayıcı: {p_name}")
+
+                if p_name == "gemini":
                     model_name = provider.get("model", "models/gemini-2.5-flash-lite")
-                    print(f"[DEBUG] Gemini API'sine istek gönderiliyor (model: {model_name})...")
                     if self.client_gemini is None:
                         raise Exception("Gemini istemcisi başlatılamadı")
                     response = self.client_gemini.models.generate_content(
@@ -171,64 +137,52 @@ class ProviderManager:
                         )
                     )
                     response_text = response.text or ""
-                    self.failure_counts[p_name] = 0  # Başarı durumunda sıfırla
-                    if p_name in self.circuit_breakers: del self.circuit_breakers[p_name]
-                    print(f"[DEBUG] Gemini başarıyla yanıt verdi")
+                    self.failure_counts[p_name] = 0
+                    self.circuit_breakers.pop(p_name, None)
                     return response_text
                     
-                elif provider["name"] == "groq":
+                elif p_name == "groq":
                     model_name = provider.get("model", "llama-3.3-70b-versatile")
-                    print(f"[DEBUG] Groq API'sine istek gönderiliyor (model: {model_name})...")
                     if self.client_groq is None:
                         raise Exception("Groq istemcisi başlatılamadı")
                     chat_completion = self.client_groq.chat.completions.create(
-                        messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}],
+                        messages=[{"role": "system", "content": system_prompt},
+                                  {"role": "user", "content": prompt}],
                         model=model_name,
                         max_tokens=8192,
                         timeout=30.0
                     )
                     response_content = chat_completion.choices[0].message.content or ""
                     self.failure_counts[p_name] = 0
-                    if p_name in self.circuit_breakers: del self.circuit_breakers[p_name]
-                    print(f"[DEBUG] Groq başarıyla yanıt verdi")
+                    self.circuit_breakers.pop(p_name, None)
                     return response_content
                     
-                elif provider["name"] == "openrouter":
+                elif p_name == "openrouter":
                     model_name = provider.get("model", "google/gemini-2.0-flash-lite-preview:free")
-                    print(f"[DEBUG] OpenRouter API'sine istek gönderiliyor (model: {model_name})...")
                     if self.client_openrouter is None:
                         raise Exception("OpenRouter istemcisi başlatılamadı")
                     completion = self.client_openrouter.chat.completions.create(
                         model=model_name,
-                        messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}],
+                        messages=[{"role": "system", "content": system_prompt},
+                                  {"role": "user", "content": prompt}],
                         max_tokens=8192
                     )
                     response_content = completion.choices[0].message.content or ""
                     self.failure_counts[p_name] = 0
-                    if p_name in self.circuit_breakers: del self.circuit_breakers[p_name]
-                    print(f"[DEBUG] OpenRouter başarıyla yanıt verdi")
+                    self.circuit_breakers.pop(p_name, None)
                     return response_content
             
             except Exception as e:
                 last_error = e
                 self.failure_counts[p_name] = self.failure_counts.get(p_name, 0) + 1
-                
-                print(f"[DEBUG] {p_name} hata fırlattı: {type(e).__name__} (Hata Sayısı: {self.failure_counts[p_name]})")
-                
+
                 if self.failure_counts[p_name] >= self.MAX_FAILURES:
                     self.circuit_breakers[p_name] = time.time() + self.RECOVERY_TIME
-                    print(f"[DEBUG] {p_name} için Circuit Breaker AÇILDI. {self.RECOVERY_TIME}s devre dışı.")
 
-                action = self._handle_error(e, p_name)
+                self._handle_error(e, p_name)
                 continue
         
-        print("[DEBUG] Tüm sağlayıcılar başarısız oldu.")
-        print(f"[DEBUG] Denenen sağlayıcılar: {', '.join(attempted_providers)}")
-        
         if last_error:
-            error_msg = f"Tüm sağlayıcılar başarısız oldu. Son hata: {type(last_error).__name__} - {str(last_error)}"
+            raise Exception(f"Tüm sağlayıcılar başarısız oldu. Son hata: {type(last_error).__name__} - {str(last_error)}")
         else:
-            error_msg = "Tüm sağlayıcılar başarısız oldu. (Kullanılabilir sağlayıcı yok)"
-        
-        print(f"[DEBUG] {error_msg}")
-        raise Exception(error_msg)
+            raise Exception("Tüm sağlayıcılar başarısız oldu. (Kullanılabilir sağlayıcı yok)")
