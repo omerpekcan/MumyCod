@@ -26,7 +26,7 @@ class GroqProvider(BaseProvider):
                     }
                 ]
             )
-            return completion.choices[0].message.content
+            return completion.choices[0].message.content or ""
         except Exception as e:
             return f"Error in Groq generate: {str(e)}"
 
@@ -37,7 +37,7 @@ class GroqProvider(BaseProvider):
             messages=messages
         )
 
-        return completion.choices[0].message.content
+        return completion.choices[0].message.content or ""
 
     def summarize(self, text: str) -> str:
 

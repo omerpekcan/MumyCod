@@ -36,6 +36,12 @@ class ConfigLoader:
 class ProviderManager:
     def __init__(self):
         self.config = ConfigLoader.load_config()
+        
+        # İstemcileri başlat
+        self.client_gemini = None
+        self.client_groq = None
+        self.client_openrouter = None
+        
         print("[DEBUG] .env dosyası yükleniyor...")
         
         self.blacklist = set()
@@ -54,15 +60,11 @@ class ProviderManager:
             key_preview = f"(ilk 10 karakter: {provider['api_key'][:10]}...)" if provider["api_key"] else "bulunamadı"
             print(f"  {status} {provider['name'].upper()}: API anahtarı {key_preview}")
         
-        # İstemcileri başlat
-        print("[DEBUG] İstemciler başlatılıyor...")
-        self.client_gemini = genai.Client(api_key=self.config["primary"]["api_key"]) if self.config["primary"]["api_key"] else None
-        
-        groq_cfg = next((p for p in self.config["fallbacks"] if p["name"] == "groq"), None)
-        self.client_groq = Groq(api_key=groq_cfg["api_key"]) if groq_cfg and groq_cfg["api_key"] else None
-        
-        or_cfg = next((p for p in self.config["fallbacks"] if p["name"] == "openrouter"), None)
-        self.client_openrouter = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=or_cfg["api_key"]) if or_cfg and or_cfg["api_key"] else None
+        # API anahtarlarının varlığını kontrol et ve log bas (GÜVENLİ)
+        print("[DEBUG] API anahtarları kontrol ediliyor:")
+        for provider in self.providers:
+            status = "[OK]" if provider["api_key"] else "[MISSING]"
+            print(f"  {status} {provider['name'].upper()}")
 
     def _get_status_code(self, e):
         """Hata nesnesinden HTTP durum kodunu çıkarır."""
